@@ -74,6 +74,14 @@ Minimal local QA smoke workflow for main-flow E2E validation:
   - QA evidence record: issue `#23` comments thread at https://github.com/Taskix-AI/Taskix/issues/23
 - Architect merge-readiness inputs: confirmation that the smoke job passed or failed, the exact commands run, the browser scenarios exercised, and the final QA evidence link on issue `#23`
 
+Planning-only safe main-flow smoke recheck for Issue 15:
+
+- Workflow ID: `WF-20260430-004`
+- Planning issue: https://github.com/Taskix-AI/Taskix/issues/32
+- Scope: documentation-only planning for a safe main-flow smoke recheck; no deployment work is in scope
+- Execution stop point: implementation stops after planning is documented in repository guidance
+- Job handling: any `issue_run` jobs are only queued for later manual Run Jobs execution and are not executed as part of this work
+
 - PM keeps talking with the user and hands confirmed requirements to the architect.
 - Architect creates issues with developerRole and ownedPaths.
 - Developers must stay inside ownedPaths.
