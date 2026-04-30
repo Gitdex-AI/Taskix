@@ -52,7 +52,7 @@ Keep secrets in `.env` or local settings, never in source files. Common local va
 <!-- taskix:workflow:start -->
 ## Taskix Workflow
 
-Project: Issue 16 QA
+Project: Issue 16 QA Worktree
 
 - PM keeps talking with the user and hands confirmed requirements to the architect.
 - Architect creates issues with developerRole and ownedPaths.
