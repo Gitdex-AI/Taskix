@@ -48,3 +48,17 @@ The GitHub repository is `git@github.com:Taskix-AI/Taskix.git`. Use concise, imp
 ## Security & Configuration Tips
 
 Keep secrets in `.env` or local settings, never in source files. Common local variables include `APP_BASE_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `CODEX_BIN`, `GITHUB_TOKEN`, `GITHUB_REPO`, and `DATA_DIR`. Do not commit generated SQLite files, SSH keys, Codex session data, or other contents from `data/`.
+
+<!-- taskix:workflow:start -->
+## Taskix Workflow
+
+Project: Issue 16 QA
+
+- PM keeps talking with the user and hands confirmed requirements to the architect.
+- Architect creates issues with developerRole and ownedPaths.
+- Developers must stay inside ownedPaths.
+- QA must validate every developer PR before merge.
+- Architect may merge only after QA passes.
+- DevOps owns deployment setup, GitHub Actions/CD workflow, deployment secrets guidance, release automation, and rollback planning.
+- Automatic deployment is disabled until manual approval or DevOps enables CD.
+<!-- taskix:workflow:end -->
