@@ -1,0 +1,188 @@
+import type { DeveloperRoleId } from "@/lib/developer-roles";
+
+export type Role =
+  | "product_manager"
+  | "developer"
+  | "qa"
+  | "architect"
+  | "devops";
+
+export type WorkflowStatus = "created" | "planned" | "in_progress" | "blocked" | "done";
+export type AgentSessionStatus = "active" | "blocked" | "done";
+export type AgentMessageRole = "user" | "assistant" | "system";
+export type JobStatus = "pending" | "running" | "done" | "failed";
+export type JobType = "workflow_run" | "issue_run";
+
+export type Settings = {
+  appBaseUrl: string;
+  telegramBotToken: string;
+  telegramWebhookSecret: string;
+  codexBin: string;
+  codexHome: string;
+  codexModel: string;
+  codexSandbox: string;
+  codexApprovalPolicy: string;
+  githubToken: string;
+  githubRepo: string;
+  githubApiUrl: string;
+  githubUsername: string;
+  githubSshPrivateKeyPath: string;
+  githubSshPublicKey: string;
+};
+
+export type IssueSpec = {
+  title: string;
+  description: string;
+  assigneeRole: Role;
+  developerRole?: DeveloperRoleId;
+  ownedPaths: string[];
+  acceptanceCriteria: string[];
+};
+
+export type IssueRecord = IssueSpec & {
+  issueId: string;
+  githubIssueNumber?: number | null;
+  githubIssueUrl?: string | null;
+  prUrl?: string | null;
+  branch?: string | null;
+  labels?: string[];
+  prLabels?: string[];
+  githubState?: string | null;
+  prState?: string | null;
+  developerSessionId?: string | null;
+  qaSessionId?: string | null;
+};
+
+export type DeveloperResult = {
+  summary: string;
+  implementationNotes: string[];
+  prTitle: string;
+  prBody: string;
+};
+
+export type DeveloperIssueResult = {
+  summary: string;
+  branch: string;
+  prUrl: string;
+  changedFiles: string[];
+  testsRun: string[];
+};
+
+export type ArchitectPrReviewDecision = "need_qa" | "ready_to_merge" | "changes_requested" | "merged" | "blocked";
+
+export type ArchitectPrReviewResult = {
+  decision: ArchitectPrReviewDecision;
+  summary: string;
+  labelsApplied: string[];
+  comments: string[];
+};
+
+export type QaPrReviewResult = {
+  passed: boolean;
+  summary: string;
+  findings: string[];
+  labelsApplied: string[];
+  testsRun: string[];
+};
+
+export type QaResult = {
+  passed: boolean;
+  summary: string;
+  findings: string[];
+  followUpIssue?: IssueSpec | null;
+};
+
+export type ArchitectReviewResult = {
+  approved: boolean;
+  summary: string;
+  mergePlan: string;
+  deploymentPlan: string;
+  risks: string[];
+};
+
+export type WorkflowRecord = {
+  workflowId: string;
+  trackingCode?: string | null;
+  userRequirement: string;
+  status: WorkflowStatus;
+  chatId: number;
+  createdAt: string;
+  paused?: boolean;
+  pausedAt?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
+  issues: IssueRecord[];
+  timeline: string[];
+};
+
+export type ProjectRecord = {
+  projectId: string;
+  name: string;
+  slug: string;
+  githubRepo: string;
+  githubAccount: string;
+  githubAccessToken: string;
+  autoDeploy: boolean;
+  agentsFilePath: string;
+  projectManagerSessionId?: string | null;
+  architectSessionId?: string | null;
+  devopsSessionId?: string | null;
+  createdAt: string;
+  teamRoles: Role[];
+};
+
+export type AgentMessage = {
+  role: AgentMessageRole;
+  content: string;
+  createdAt: string;
+};
+
+export type AgentSessionRecord = {
+  sessionKey: string;
+  projectId: string;
+  role: Role;
+  title: string;
+  status: AgentSessionStatus;
+  sessionId?: string | null;
+  workflowId?: string | null;
+  issueId?: string | null;
+  developerRole?: DeveloperRoleId | null;
+  ownedPaths?: string[];
+  currentStep?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMs?: number | null;
+  githubIssueNumber?: number | null;
+  githubIssueUrl?: string | null;
+  prUrl?: string | null;
+  labels?: string[];
+  lastSyncedAt?: string | null;
+  closedAt?: string | null;
+  archivedAt?: string | null;
+  messages: AgentMessage[];
+  updatedAt: string;
+};
+
+export type JobRecord = {
+  jobId: string;
+  projectId?: string | null;
+  type: JobType;
+  status: JobStatus;
+  createdAt: string;
+  updatedAt: string;
+  attempts: number;
+  error?: string | null;
+  payload: {
+    workflowId: string;
+    issueId?: string | null;
+  };
+};
+
+export type TelegramUpdate = {
+  update_id: number;
+  message?: {
+    message_id?: number;
+    text?: string;
+    chat: { id: number };
+  };
+};

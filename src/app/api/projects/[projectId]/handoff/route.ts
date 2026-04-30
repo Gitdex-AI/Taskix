@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import { createWorkflow } from "@/lib/orchestrator";
+import { findReadyForArchitectPayload, formatPmHandoffPayload, parseReadyForArchitectPayload } from "@/lib/pm-handoff";
+import { createJob, getAgentSession, getProject } from "@/lib/store";
+
+export async function POST(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
+  const { projectId } = await params;
+  const project = await getProject(projectId);
+  if (!project) return redirect(request, `/projects?error=${encodeURIComponent("Project not found.")}`);
+
+  const form = await request.formData();
+  const submittedPayload = parseReadyForArchitectPayload(String(form.get("payload") ?? ""));
+  const pmSession = await getAgentSession(`${project.projectId}:product_manager`);
+  const payload = submittedPayload ?? findReadyForArchitectPayload(pmSession);
+  if (!payload) {
+    return redirect(request, `/projects/${project.projectId}?role=product_manager&error=${encodeURIComponent("PM has not produced ready_for_architect JSON yet.")}`);
+  }
+
+  try {
+    const workflow = await createWorkflow(formatPmHandoffPayload(payload), 0, project);
+    await createJob({
+      projectId: project.projectId,
+      type: "workflow_run",
+      payload: { workflowId: workflow.workflowId }
+    });
+    return redirect(request, `/projects/${project.projectId}?role=architect&autorun=1`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Architect handoff failed.";
+    return redirect(request, `/projects/${project.projectId}?role=product_manager&error=${encodeURIComponent(message)}`);
+  }
+}
+
+function redirect(request: Request, location: string): NextResponse {
+  return NextResponse.redirect(new URL(location, request.url), { status: 303 });
+}

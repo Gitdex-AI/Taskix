@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Local runtime data
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Codex / agent local state
+codex-home/
+.codex/
+
+# Local cloned workspaces and generated issue worktrees
+firstApp/
+firstApp-*/
+*-issue*/
+*-WF-*/
+
+# Python / test caches
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local secrets and scratch notes
+*-pwd.md
+*password*.md
+*secret*.md

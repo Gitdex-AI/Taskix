@@ -1,0 +1,123 @@
+import { Alert, Badge, Button, Code, Group, Paper, PasswordInput, SimpleGrid, Text, TextInput, Textarea } from "@mantine/core";
+import { GitBranch, Info, KeyRound, Save, Webhook, Wrench } from "lucide-react";
+import { PageTitle } from "@/components/PageTitle";
+import { getSettings } from "@/lib/settings";
+
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ message?: string; error?: string }> }) {
+  const [{ message, error }, settings] = await Promise.all([searchParams, getSettings()]);
+  const hasGitHubKey = Boolean(settings.githubUsername && settings.githubSshPrivateKeyPath && settings.githubSshPublicKey);
+
+  return (
+    <>
+      <PageTitle title="Settings" />
+      {(message || error) && (
+        <Alert color={error ? "red" : "blue"} icon={<Info size={16} />} mb="md">
+          {message ?? error}
+        </Alert>
+      )}
+      <Paper mb="md">
+        <Group justify="space-between" p="md">
+          <div>
+            <Text fw={760}>Tool Checks</Text>
+            <Text size="sm" c="dimmed">
+              Codex and GitHub CLI checks live on a dedicated Tools page.
+            </Text>
+          </div>
+          <Button component="a" href="/tools" variant="light" leftSection={<Wrench size={16} />}>
+            Open Tools
+          </Button>
+        </Group>
+      </Paper>
+      <Paper mb="md">
+        <Group justify="space-between" p="md" className="section-header">
+          <div>
+            <Text fw={760}>GitHub Owner</Text>
+            <Badge color={hasGitHubKey ? "green" : "yellow"} variant="light">
+              {hasGitHubKey ? "key ready" : "setup required"}
+            </Badge>
+            <Text size="sm" c="dimmed">
+              Configure a GitHub user or organization owner before adding projects.
+            </Text>
+          </div>
+        </Group>
+        <div className="panel-body">
+          <form method="post" action="/api/github/account">
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <TextInput name="githubUsername" label="GitHub Owner" description="User or organization, for example octocat or my-org." defaultValue={settings.githubUsername} placeholder="owner-or-org" required />
+              <TextInput label="SSH Private Key" value={settings.githubSshPrivateKeyPath || "not generated"} readOnly />
+            </SimpleGrid>
+            <Textarea
+              label="SSH Public Key"
+              description="Add this key to the GitHub user/org that owns the repositories."
+              value={settings.githubSshPublicKey || "Generate a key first."}
+              autosize
+              minRows={3}
+              readOnly
+            />
+            <Alert color="blue" icon={<Info size={16} />}>
+              The private key is stored as a local file at the path above. SQLite stores only the GitHub owner, private key path, and public key text.
+            </Alert>
+            <Group className="form-actions">
+              <Button type="submit" leftSection={<KeyRound size={16} />}>
+                Save Account / Ensure SSH Key
+              </Button>
+              <Button component="a" href="https://github.com/settings/keys" target="_blank" variant="light" leftSection={<GitBranch size={16} />}>
+                Open GitHub SSH Keys
+              </Button>
+            </Group>
+            {settings.githubUsername && (
+              <Text size="sm" c="dimmed" mt="sm">
+                Add Project will list repositories owned by <Code>{settings.githubUsername}</Code> using your local <Code>gh</Code> login.
+              </Text>
+            )}
+          </form>
+        </div>
+      </Paper>
+      <Paper>
+        <Group justify="space-between" p="md" className="section-header">
+          <div>
+            <Text fw={760}>Runtime Settings</Text>
+            <Text size="sm" c="dimmed">
+              Saved to data/taskix.sqlite
+            </Text>
+          </div>
+        </Group>
+        <div className="panel-body">
+          <form method="post" action="/api/settings">
+            <Text className="section-title">App</Text>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <TextInput name="appBaseUrl" label="App Base URL" defaultValue={settings.appBaseUrl} placeholder="https://your-bot.example.com" />
+              <TextInput name="telegramWebhookSecret" label="Telegram Webhook Secret" defaultValue={settings.telegramWebhookSecret} placeholder="secret-token" />
+            </SimpleGrid>
+            <PasswordInput name="telegramBotToken" label="Telegram Bot Token" defaultValue={settings.telegramBotToken} placeholder="123456:ABC..." />
+
+            <Text className="section-title">Codex CLI</Text>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <TextInput name="codexBin" label="Codex Binary" defaultValue={settings.codexBin} />
+              <TextInput name="codexHome" label="Codex Home" defaultValue={settings.codexHome} description="Must contain Codex login/auth state for bot execution." />
+              <TextInput name="codexModel" label="Model" defaultValue={settings.codexModel} />
+              <TextInput name="codexSandbox" label="Sandbox" defaultValue={settings.codexSandbox} />
+              <TextInput name="codexApprovalPolicy" label="Approval Policy" defaultValue={settings.codexApprovalPolicy} />
+            </SimpleGrid>
+
+            <Text className="section-title">Fallback GitHub API</Text>
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <TextInput name="githubRepo" label="GitHub Repo" defaultValue={settings.githubRepo} placeholder="owner/repo" />
+              <TextInput name="githubApiUrl" label="GitHub API URL" defaultValue={settings.githubApiUrl} />
+            </SimpleGrid>
+            <PasswordInput name="githubToken" label="GitHub Token" defaultValue={settings.githubToken} placeholder="ghp_..." />
+
+            <Group className="form-actions">
+              <Button type="submit" leftSection={<Save size={16} />}>
+                Save Settings
+              </Button>
+              <Button type="submit" variant="light" leftSection={<Webhook size={16} />} formAction="/api/setup/webhook">
+                Setup Telegram Webhook
+              </Button>
+            </Group>
+          </form>
+        </div>
+      </Paper>
+    </>
+  );
+}
