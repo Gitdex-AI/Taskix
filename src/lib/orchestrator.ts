@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CodexClient } from "@/lib/codex";
 import { GitHubClient } from "@/lib/github";
-import { createIssueWithGh, getIssueSnapshotWithGh } from "@/lib/github-local";
+import { addLabelsWithGh, createIssueWithGh, getIssueSnapshotWithGh } from "@/lib/github-local";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, createJob, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { IssueRecord, IssueSpec, ProjectRecord, WorkflowRecord } from "@/lib/types";
@@ -337,6 +337,19 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     prUrl: developerResult.prUrl,
     autoDeploy: project.autoDeploy
   });
+  if (isIncompleteArchitectReview(architectReview)) {
+    const labels = ["taskix:need-qa"];
+    await Promise.all([
+      addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, labels),
+      addLabelsWithGh(project.githubRepo, developerResult.prUrl, labels)
+    ]);
+    architectReview = {
+      decision: "need_qa",
+      summary: `Architect runner did not complete structured PR review. Taskix conservatively requested QA for ${developerResult.prUrl}.`,
+      labelsApplied: labels,
+      comments: []
+    };
+  }
   if (workflow.projectId) {
     await appendAgentMessages({
       sessionKey: `${workflow.projectId}:architect`,
@@ -487,6 +500,10 @@ function deriveQaSessionStatus(labels: string[]): "active" | "blocked" | "done" 
   if (labels.includes("taskix:qa-failed")) return "blocked";
   if (labels.includes("taskix:need-qa") || labels.includes("taskix:qa-running")) return "active";
   return null;
+}
+
+function isIncompleteArchitectReview(review: { decision: string; summary: string; labelsApplied: string[] }): boolean {
+  return review.decision === "blocked" && !review.labelsApplied.length && review.summary.includes("Architect runner did not complete PR review");
 }
 
 function deriveWorkflowStatus(workflow: WorkflowRecord): WorkflowRecord["status"] {
