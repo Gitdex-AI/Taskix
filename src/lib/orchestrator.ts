@@ -3,7 +3,7 @@ import { CodexClient } from "@/lib/codex";
 import { GitHubClient } from "@/lib/github";
 import { createIssueWithGh, getIssueSnapshotWithGh } from "@/lib/github-local";
 import { getSettings } from "@/lib/settings";
-import { appendAgentMessages, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
+import { appendAgentMessages, createJob, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { IssueRecord, IssueSpec, ProjectRecord, WorkflowRecord } from "@/lib/types";
 
 export async function createWorkflow(requirement: string, chatId: number, project?: ProjectRecord | null): Promise<WorkflowRecord> {
@@ -90,25 +90,19 @@ export async function runWorkflow(workflowId: string, project?: ProjectRecord | 
     });
   }
 
-  workflow.status = "in_progress";
+  workflow.status = "planned";
   workflow.timeline.push(`Created ${workflow.issues.length} GitHub issue(s) with Taskix labels.`);
-  workflow.timeline.push(`Starting ${workflow.issues.length} developer role task(s) concurrently.`);
-  await saveWorkflow(workflow);
-
-  const results = await Promise.all(workflow.issues.map((issue) => runIssue(issue, workflow, codex, issueCreator, project)));
-  let blocked = false;
-  const releaseNotes = [];
-  for (const result of results) {
-    workflow.timeline.push(...result.timeline);
-    releaseNotes.push(result.releaseNote);
-    blocked ||= result.blocked;
-  }
-
-  if (blocked) {
-    workflow.status = "blocked";
+  if (project?.projectId) {
+    for (const issue of workflow.issues) {
+      await createJob({
+        projectId: project.projectId,
+        type: "issue_run",
+        payload: { workflowId: workflow.workflowId, issueId: issue.issueId }
+      });
+    }
+    workflow.timeline.push(`Queued ${workflow.issues.length} developer issue job(s). Use Run Jobs to start developer execution.`);
   } else {
-    workflow.timeline.push(`Architect release summary: ${await codex.architectReleaseSummary(workflow.userRequirement, releaseNotes, project?.autoDeploy ?? false)}`);
-    workflow.status = "done";
+    workflow.timeline.push("Developer issue jobs were not queued because this workflow is not bound to a project.");
   }
 
   await saveWorkflow(workflow);
