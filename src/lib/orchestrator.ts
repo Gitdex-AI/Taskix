@@ -538,6 +538,57 @@ async function readPullRequestRefs(repo: string, pr: string): Promise<{ head: st
   }
 }
 
+type PullRequestEvidence = {
+  body: string;
+  comments: string[];
+};
+
+async function readPullRequestEvidence(repo: string, pr: string): Promise<PullRequestEvidence> {
+  try {
+    const { stdout } = await execFileAsync("gh", ["pr", "view", pr, "--repo", repo, "--json", "body,comments"]);
+    const payload = JSON.parse(stdout) as { body?: string; comments?: Array<{ body?: string }> };
+    return {
+      body: payload.body ?? "",
+      comments: (payload.comments ?? []).map((comment) => comment.body ?? "")
+    };
+  } catch {
+    return { body: "", comments: [] };
+  }
+}
+
+function normalizeEvidenceText(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function missingManualDeployBodyEvidence(body: string): string[] {
+  const required = [
+    "## Manual-Deploy QA Evidence",
+    "- Deterministic recovery:",
+    "- Recovery source:",
+    "- Recovered base:",
+    "- Ready-to-merge expectation:",
+    "- Generated PR merge:"
+  ];
+  const normalized = normalizeEvidenceText(body);
+  return required.filter((marker) => !normalized.includes(marker.toLowerCase()));
+}
+
+function hasPassingQaEvidenceComment(comments: string[]): boolean {
+  return comments.some((comment) => {
+    const normalized = normalizeEvidenceText(comment);
+    return [
+      "## qa passing evidence",
+      "- commands run:",
+      "- pr body evidence visible:",
+      "- recovery source visible:",
+      "- recovered base visible:",
+      "- ready-to-merge expectation confirmed:",
+      "- generated pr still open:",
+      "- generated pr merged: no"
+    ].every((marker) => normalized.includes(marker));
+  });
+}
+
 async function requestInitialPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
   if (!project.autoDeploy && issue.githubIssueNumber) {
     const labels = ["taskix:need-qa"];
@@ -577,8 +628,32 @@ async function requestInitialPrReview(project: ProjectRecord, issue: IssueRecord
 
 async function requestFinalPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
   if (!project.autoDeploy && issue.githubIssueNumber) {
+    const evidence = await readPullRequestEvidence(project.githubRepo, prUrl);
+    const missingBodyEvidence = missingManualDeployBodyEvidence(evidence.body);
+    const hasQaEvidenceComment = hasPassingQaEvidenceComment(evidence.comments);
+    if (missingBodyEvidence.length || !hasQaEvidenceComment) {
+      const addLabels = ["taskix:blocked", "taskix:need-qa"];
+      const removeLabels = ["taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"];
+      const missingEvidence = [
+        ...(missingBodyEvidence.length ? [`PR body missing: ${missingBodyEvidence.join(", ")}`] : []),
+        ...(!hasQaEvidenceComment ? ["PR comment missing required `## QA Passing Evidence` markers."] : [])
+      ].join(" ");
+      await Promise.all([
+        addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, addLabels),
+        addLabelsWithGh(project.githubRepo, prUrl, addLabels),
+        removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, removeLabels),
+        removeLabelsWithGh(project.githubRepo, prUrl, removeLabels)
+      ]);
+      return {
+        decision: "blocked" as const,
+        summary: `Manual-deploy project: QA evidence for ${prUrl} is incomplete, so Taskix did not emit ready-to-merge. ${missingEvidence}`.trim(),
+        labelsApplied: addLabels,
+        comments: []
+      };
+    }
+
     const addLabels = ["taskix:ready-to-merge"];
-    const removeLabels = ["taskix:need-qa", "taskix:qa-running"];
+    const removeLabels = ["taskix:need-qa", "taskix:qa-running", "taskix:blocked"];
     await Promise.all([
       addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, addLabels),
       addLabelsWithGh(project.githubRepo, prUrl, addLabels),

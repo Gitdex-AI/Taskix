@@ -325,7 +325,12 @@ Execution rules:
 - Run git fetch, checkout, commit, push, and gh pr create only in the current working directory.
 - Work only inside ownedPaths unless the issue explicitly requires an integration point.
 - Create a branch named taskix/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.
-- If this work validates Taskix recovery/ready-to-merge behavior, document observable verification evidence in the PR body, including deterministic recovery, recovered base visibility, ready-to-merge expectations, and no generated PR merge.
+- If this work validates Taskix recovery/ready-to-merge behavior, the PR body must include a "## Manual-Deploy QA Evidence" section with these exact bullets:
+  - "- Deterministic recovery:" explain how recovery is deterministic in this change.
+  - "- Recovery source:" identify the recovery source or state "not needed".
+  - "- Recovered base:" identify the recovered base branch or state "not needed".
+  - "- Ready-to-merge expectation:" state that the final manual-deploy state should stop at "taskix:ready-to-merge".
+  - "- Generated PR merge:" state that no generated PR is merged in this flow.
 - Implement the issue, run relevant tests, commit, push, and open a PR.
 - If implementation is blocked, comment on the issue, add taskix:blocked, and still return JSON with prUrl as an empty string.
 
@@ -365,6 +370,7 @@ Required GitHub label behavior:
 - Read the linked issue and PR with gh.
 - If QA is required before merge, add taskix:need-qa to the PR and issue, then return decision "need_qa".
 - If changes are required from developer, comment on the PR, add taskix:blocked, and return decision "changes_requested".
+- Before returning "ready_to_merge" or "merged" after QA, verify the PR contains a QA passing evidence comment that records commands run and the observable label/state.
 - If QA is already passed or QA is not needed and the PR is acceptable, add taskix:ready-to-merge and return decision "ready_to_merge".
 - If auto deploy is disabled, do not merge the PR; stop at taskix:ready-to-merge.
 - If auto deploy is enabled and QA has passed, you may merge only when repository checks and branch state are safe.
@@ -400,7 +406,14 @@ Required GitHub label behavior:
 - Add taskix:qa-running to the issue and PR when you start.
 - Read the issue acceptance criteria and PR diff using gh.
 - Validate implementation, ownedPaths, and relevant tests.
-- When passing QA, comment concise verification evidence on the PR, including commands run and any observable labels/state required by acceptance criteria.
+- When passing QA, comment on the PR with a "## QA Passing Evidence" heading and these exact bullets:
+  - "- Commands run:" list the validation commands.
+  - "- PR body evidence visible:" confirm whether the required manual-deploy evidence section is visible.
+  - "- Recovery source visible:" record the observed recovery source or "not needed".
+  - "- Recovered base visible:" record the observed recovered base or "not needed".
+  - "- Ready-to-merge expectation confirmed:" confirm the flow should stop at "taskix:ready-to-merge".
+  - "- Generated PR still open:" record "yes" or "no".
+  - "- Generated PR merged:" record "no" when passing this manual-deploy flow.
 - If passed, add taskix:qa-passed and remove taskix:qa-running.
 - If failed, comment findings on the PR, add taskix:qa-failed, and remove taskix:qa-running.
 
