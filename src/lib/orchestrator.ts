@@ -124,7 +124,7 @@ export async function runWorkflowIssue(workflowId: string, issueId: string, proj
 
   const result = await runIssue(issue, workflow, codex, createIssueCreator(project, settings), project);
   workflow.timeline.push(...result.timeline);
-  workflow.status = deriveWorkflowStatus(workflow);
+  workflow.status = deriveWorkflowStatus(workflow, project?.autoDeploy);
   if (result.blocked) workflow.status = "blocked";
   await saveWorkflow(workflow);
   if (project) await saveProject(project);
@@ -204,7 +204,7 @@ export async function syncWorkflowFromGitHub(workflowId: string, project?: Proje
     }
   }
 
-  workflow.status = deriveWorkflowStatus(workflow);
+  workflow.status = deriveWorkflowStatus(workflow, project?.autoDeploy);
   const after = JSON.stringify(workflow.issues.map((issue) => ({
     issueId: issue.issueId,
     labels: issue.labels,
@@ -421,6 +421,14 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
         autoDeploy: project.autoDeploy,
         qaPassed: true
       });
+      if (!project.autoDeploy && architectReview.decision === "merged") {
+        architectReview = {
+          ...architectReview,
+          decision: "ready_to_merge",
+          summary: `${architectReview.summary}\n\nTaskix stopped before merge because automatic merge is not enabled for this project.`,
+          labelsApplied: [...new Set([...architectReview.labelsApplied.filter((label) => label !== "taskix:merged"), "taskix:ready-to-merge"])]
+        };
+      }
       if (workflow.projectId) {
         await appendAgentMessages({
           sessionKey: `${workflow.projectId}:architect`,
@@ -481,14 +489,18 @@ function deriveQaSessionStatus(labels: string[]): "active" | "blocked" | "done" 
   return null;
 }
 
-function deriveWorkflowStatus(workflow: WorkflowRecord): WorkflowRecord["status"] {
+function deriveWorkflowStatus(workflow: WorkflowRecord, autoDeploy?: boolean): WorkflowRecord["status"] {
   if (!workflow.issues.length) return workflow.status;
   const issues = workflow.issues;
   const hasBlocked = issues.some((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:blocked", "taskix:qa-failed"]));
   if (hasBlocked) return "blocked";
-  const allDone = issues.every((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:merged", "taskix:deployed"]) || issue.prState === "MERGED");
+  const doneLabels = autoDeploy === false ? ["taskix:merged", "taskix:deployed", "taskix:ready-to-merge"] : ["taskix:merged", "taskix:deployed"];
+  const allDone = issues.every((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], doneLabels) || issue.prState === "MERGED");
   if (allDone) return "done";
-  const anyProgress = issues.some((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:dev-running", "taskix:pr-opened", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"]));
+  const progressLabels = autoDeploy === false
+    ? ["taskix:dev-running", "taskix:pr-opened", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed"]
+    : ["taskix:dev-running", "taskix:pr-opened", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"];
+  const anyProgress = issues.some((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], progressLabels));
   return anyProgress ? "in_progress" : workflow.status;
 }
 
