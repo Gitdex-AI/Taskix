@@ -342,7 +342,8 @@ Required GitHub label behavior:
 - If QA is required before merge, add taskix:need-qa to the PR and issue, then return decision "need_qa".
 - If changes are required from developer, comment on the PR, add taskix:blocked, and return decision "changes_requested".
 - If QA is already passed or QA is not needed and the PR is acceptable, add taskix:ready-to-merge and return decision "ready_to_merge".
-- Do not merge PRs in normal Taskix validation runs. Only return decision "merged" if an explicit merge-validation instruction is present outside this prompt. Auto deploy does not authorize merge by itself.
+- If auto deploy is disabled, do not merge the PR; stop at taskix:ready-to-merge.
+- If auto deploy is enabled and QA has passed, you may merge only when repository checks and branch state are safe.
 
 Return JSON with decision, summary, labelsApplied, comments.`;
     return (await this.runJson<ArchitectPrReviewResult>(prompt, schema)) ?? {

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CodexClient } from "@/lib/codex";
 import { GitHubClient } from "@/lib/github";
-import { addLabelsWithGh, createIssueWithGh, getIssueSnapshotWithGh } from "@/lib/github-local";
+import { addLabelsWithGh, createIssueWithGh, getIssueSnapshotWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, createJob, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { IssueRecord, IssueSpec, ProjectRecord, WorkflowRecord } from "@/lib/types";
@@ -331,25 +331,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     };
   }
 
-  let architectReview = await codex.architectReviewPr({
-    repo: project.githubRepo,
-    issueNumber: issue.githubIssueNumber,
-    prUrl: developerResult.prUrl,
-    autoDeploy: project.autoDeploy
-  });
-  if (isIncompleteArchitectReview(architectReview)) {
-    const labels = ["taskix:need-qa"];
-    await Promise.all([
-      addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, labels),
-      addLabelsWithGh(project.githubRepo, developerResult.prUrl, labels)
-    ]);
-    architectReview = {
-      decision: "need_qa",
-      summary: `Architect runner did not complete structured PR review. Taskix conservatively requested QA for ${developerResult.prUrl}.`,
-      labelsApplied: labels,
-      comments: []
-    };
-  }
+  let architectReview = await requestInitialPrReview(project, issue, developerResult.prUrl, codex);
   if (workflow.projectId) {
     await appendAgentMessages({
       sessionKey: `${workflow.projectId}:architect`,
@@ -427,21 +409,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
   }
     if (qaResult.passed) {
       timeline.push(`QA passed PR for issue ${issue.issueId}.`);
-      architectReview = await codex.architectReviewPr({
-        repo: project.githubRepo,
-        issueNumber: issue.githubIssueNumber,
-        prUrl: developerResult.prUrl,
-        autoDeploy: project.autoDeploy,
-        qaPassed: true
-      });
-      if (!project.autoDeploy && architectReview.decision === "merged") {
-        architectReview = {
-          ...architectReview,
-          decision: "ready_to_merge",
-          summary: `${architectReview.summary}\n\nTaskix stopped before merge because automatic merge is not enabled for this project.`,
-          labelsApplied: [...new Set([...architectReview.labelsApplied.filter((label) => label !== "taskix:merged"), "taskix:ready-to-merge"])]
-        };
-      }
+      architectReview = await requestFinalPrReview(project, issue, developerResult.prUrl, codex);
       if (workflow.projectId) {
         await appendAgentMessages({
           sessionKey: `${workflow.projectId}:architect`,
@@ -502,8 +470,68 @@ function deriveQaSessionStatus(labels: string[]): "active" | "blocked" | "done" 
   return null;
 }
 
-function isIncompleteArchitectReview(review: { decision: string; summary: string; labelsApplied: string[] }): boolean {
-  return review.decision === "blocked" && !review.labelsApplied.length && review.summary.includes("Architect runner did not complete PR review");
+async function requestInitialPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
+  if (!project.autoDeploy && issue.githubIssueNumber) {
+    const labels = ["taskix:need-qa"];
+    await Promise.all([
+      addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, labels),
+      addLabelsWithGh(project.githubRepo, prUrl, labels)
+    ]);
+    return {
+      decision: "need_qa" as const,
+      summary: `Manual-deploy project: Taskix requested QA for ${prUrl} and stopped before merge review.`,
+      labelsApplied: labels,
+      comments: []
+    };
+  }
+
+  const review = await codex.architectReviewPr({
+    repo: project.githubRepo,
+    issueNumber: issue.githubIssueNumber ?? 0,
+    prUrl,
+    autoDeploy: project.autoDeploy
+  });
+  if (review.decision === "blocked" && !review.labelsApplied.length && review.summary.includes("Architect runner did not complete PR review") && issue.githubIssueNumber) {
+    const labels = ["taskix:need-qa"];
+    await Promise.all([
+      addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, labels),
+      addLabelsWithGh(project.githubRepo, prUrl, labels)
+    ]);
+    return {
+      decision: "need_qa" as const,
+      summary: `Architect runner did not complete structured PR review. Taskix conservatively requested QA for ${prUrl}.`,
+      labelsApplied: labels,
+      comments: []
+    };
+  }
+  return review;
+}
+
+async function requestFinalPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
+  if (!project.autoDeploy && issue.githubIssueNumber) {
+    const addLabels = ["taskix:ready-to-merge"];
+    const removeLabels = ["taskix:need-qa", "taskix:qa-running"];
+    await Promise.all([
+      addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, addLabels),
+      addLabelsWithGh(project.githubRepo, prUrl, addLabels),
+      removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, removeLabels),
+      removeLabelsWithGh(project.githubRepo, prUrl, removeLabels)
+    ]);
+    return {
+      decision: "ready_to_merge" as const,
+      summary: `Manual-deploy project: QA passed and Taskix marked ${prUrl} ready to merge without merging it.`,
+      labelsApplied: addLabels,
+      comments: []
+    };
+  }
+
+  return codex.architectReviewPr({
+    repo: project.githubRepo,
+    issueNumber: issue.githubIssueNumber ?? 0,
+    prUrl,
+    autoDeploy: project.autoDeploy,
+    qaPassed: true
+  });
 }
 
 function deriveWorkflowStatus(workflow: WorkflowRecord): WorkflowRecord["status"] {
