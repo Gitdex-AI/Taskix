@@ -48,19 +48,24 @@ export default async function ProjectDetailPage({
   const queuedWorkflow = queuedWorkflowId ? workflows.find((workflow) => workflow.workflowId === queuedWorkflowId) ?? null : null;
   const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
+  const workflowPanelWorkflows = visibleActiveWorkflows.length ? visibleActiveWorkflows : doneWorkflows.slice(0, 3);
+  const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
+  const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
+  const workflowPanelDynamicSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && !session.archivedAt);
+  const workflowPanelArchivedSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && session.archivedAt);
   const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
-  const nextAction = getWorkflowNextAction(jobs);
-  const workflowProgress = getWorkflowProgress({ workflows, jobs });
+  const nextAction = getWorkflowNextAction(workflowPanelJobs);
+  const workflowProgress = getWorkflowProgress({ workflows: workflowPanelWorkflows, jobs: workflowPanelJobs });
   const workflowStepDetails = buildWorkflowStepDetails({
     projectId: project.projectId,
     isInspectingIssueSession,
     readyForArchitectPayload,
     pmSession,
-    sessions,
-    dynamicSessions,
-    archivedSessions,
-    jobs,
-    activeWorkflows,
+    sessions: workflowPanelSessions,
+    dynamicSessions: workflowPanelDynamicSessions,
+    archivedSessions: workflowPanelArchivedSessions,
+    jobs: workflowPanelJobs,
+    activeWorkflows: visibleActiveWorkflows,
     doneWorkflows,
     visibleActiveWorkflows,
     queuedWorkflow,
@@ -133,7 +138,7 @@ export default async function ProjectDetailPage({
                 steps={workflowProgress}
                 nextAction={nextAction}
                 projectId={project.projectId}
-                workflows={visibleActiveWorkflows.length ? visibleActiveWorkflows : doneWorkflows.slice(0, 3)}
+                workflows={workflowPanelWorkflows}
                 stepDetails={workflowStepDetails}
               />
             </Stack>
@@ -151,6 +156,27 @@ function prioritizeById<T extends { workflowId?: string; jobId?: string }>(items
     const rightSelected = right.workflowId === selectedId || right.jobId === selectedId;
     if (leftSelected === rightSelected) return 0;
     return leftSelected ? -1 : 1;
+  });
+}
+
+function filterJobsForWorkflows(jobs: JobRecord[], workflows: WorkflowRecord[]): JobRecord[] {
+  const workflowIds = new Set(workflows.map((workflow) => workflow.workflowId));
+  if (!workflowIds.size) return [];
+  return jobs.filter((job) => workflowIds.has(job.payload.workflowId));
+}
+
+function filterSessionsForWorkflows(sessions: AgentSessionRecord[], workflows: WorkflowRecord[]): AgentSessionRecord[] {
+  const workflowIds = new Set(workflows.map((workflow) => workflow.workflowId));
+  const issueSessionIds = new Set(
+    workflows.flatMap((workflow) => workflow.issues.flatMap((issue) => [issue.issueId, issue.developerSessionId, issue.qaSessionId].filter(Boolean) as string[]))
+  );
+  if (!workflowIds.size) return sessions.filter((session) => session.role === "product_manager" || session.role === "architect" || session.role === "devops");
+
+  return sessions.filter((session) => {
+    if (session.role === "product_manager" || session.role === "architect" || session.role === "devops") return true;
+    if (session.workflowId && workflowIds.has(session.workflowId)) return true;
+    if (session.issueId && issueSessionIds.has(session.issueId)) return true;
+    return issueSessionIds.has(session.sessionKey);
   });
 }
 
