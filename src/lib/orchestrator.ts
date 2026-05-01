@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { CodexClient } from "@/lib/codex";
 import { GitHubClient } from "@/lib/github";
-import { addLabelsWithGh, createIssueWithGh, getIssueSnapshotWithGh, removeLabelsWithGh } from "@/lib/github-local";
+import { addLabelsWithGh, createIssueWithGh, createPullRequestWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, createJob, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { IssueRecord, IssueSpec, ProjectRecord, WorkflowRecord } from "@/lib/types";
@@ -283,6 +283,13 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     issue,
     workflowId: displayWorkflowCode(workflow)
   });
+  if (!developerResult.prUrl && developerResult.branch) {
+    const recoveredPrUrl = await recoverDeveloperPullRequest(project.githubRepo, issue, workflow, developerResult.branch);
+    if (recoveredPrUrl) {
+      developerResult.prUrl = recoveredPrUrl;
+      developerResult.summary = `${developerResult.summary}\n\nTaskix recovered the PR URL after developer publishing returned empty.`;
+    }
+  }
   issue.prUrl = developerResult.prUrl || null;
   issue.branch = developerResult.branch || null;
   if (workflow.projectId) {
@@ -468,6 +475,45 @@ function deriveQaSessionStatus(labels: string[]): "active" | "blocked" | "done" 
   if (labels.includes("taskix:qa-failed")) return "blocked";
   if (labels.includes("taskix:need-qa") || labels.includes("taskix:qa-running")) return "active";
   return null;
+}
+
+async function recoverDeveloperPullRequest(repo: string, issue: IssueRecord, workflow: WorkflowRecord, branch: string): Promise<string | null> {
+  try {
+    const existingPrUrl = await findPullRequestByHeadWithGh(repo, branch);
+    if (existingPrUrl) return existingPrUrl;
+    const base = await currentBranch();
+    const labels = ["taskix:pr-opened", "taskix:architect-review", `role:${issue.developerRole ?? "general_developer"}`];
+    const body = [
+      `Closes #${issue.githubIssueNumber}`,
+      "",
+      `Recovered by Taskix after developer pushed branch ${branch} but did not return a PR URL.`,
+      "",
+      `Workflow: ${displayWorkflowCode(workflow)}`,
+      `Issue: ${issue.issueId}`
+    ].join("\n");
+    return await createPullRequestWithGh({
+      repo,
+      head: branch,
+      base,
+      title: issue.title,
+      body,
+      labels
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function currentBranch(): Promise<string | null> {
+  try {
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync("git", ["branch", "--show-current"]);
+    return stdout.trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 async function requestInitialPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
