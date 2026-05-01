@@ -194,7 +194,7 @@ function buildWorkflowStepDetails(input: {
     developer: (
       <Stack gap="xs">
         {renderJobRows(input.jobs.filter((job) => job.type === "issue_run"), input.queuedJobId)}
-        {renderWorkflowCards(input.projectId, input.visibleActiveWorkflows, input.sessions)}
+        {renderDeveloperIssueRows(input.visibleActiveWorkflows, input.sessions)}
         {renderSessionRows(developerSessions)}
       </Stack>
     ),
@@ -239,31 +239,14 @@ function renderJobRows(jobs: JobRecord[], queuedJobId: string | null): ReactNode
   ));
 }
 
-function renderWorkflowCards(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): ReactNode {
-  if (!workflows.length) return <Text size="xs" c="dimmed">No active workflow details for this step.</Text>;
-  return workflows.map((workflow) => (
-    <div key={workflow.workflowId} className="workflow-summary-card">
-      <Group justify="space-between" gap="xs">
-        <div>
-          <Text fw={700} size="sm">
-            {workflow.trackingCode ?? workflow.workflowId} · {workflow.paused ? "paused" : workflow.status}
-          </Text>
-          <Text size="xs" c="dimmed" lineClamp={1}>{workflow.userRequirement}</Text>
-        </div>
-        <Group gap={6}>
-          <Button component="a" href={`/projects/${projectId}/workflows/${workflow.workflowId}`} variant="light" size="compact-xs" radius="xl">
-            Open
-          </Button>
-          <WorkflowPauseButton workflowId={workflow.workflowId} paused={Boolean(workflow.paused)} />
-        </Group>
-      </Group>
-      {workflow.issues.map((issue) => {
-        const qaSession = sessions.find((session) => session.sessionKey === issue.qaSessionId);
-        const qaStatus = getIssueQaStatus(issue, qaSession);
-        return <IssueStatusRow key={issue.issueId} issue={issue} qaStatus={qaStatus} />;
-      })}
-    </div>
-  ));
+function renderDeveloperIssueRows(workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): ReactNode {
+  const issues = workflows.flatMap((workflow) => workflow.issues);
+  if (!issues.length) return <Text size="xs" c="dimmed">No developer issues planned yet.</Text>;
+  return issues.map((issue) => {
+    const qaSession = sessions.find((session) => session.sessionKey === issue.qaSessionId);
+    const qaStatus = getIssueQaStatus(issue, qaSession);
+    return <IssueStatusRow key={issue.issueId} issue={issue} qaStatus={qaStatus} />;
+  });
 }
 
 function renderQaIssueRows(workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): ReactNode {
