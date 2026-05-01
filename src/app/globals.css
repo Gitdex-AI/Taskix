@@ -259,6 +259,10 @@ body {
 }
 
 .chat-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  flex: 0 0 auto;
   padding: 10px min(8vw, 84px) 22px;
   border-top: 0;
   background:
