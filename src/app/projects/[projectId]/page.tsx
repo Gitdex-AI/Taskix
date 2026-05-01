@@ -6,6 +6,7 @@ import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
 import { ProjectChatArea } from "@/components/ProjectChatArea";
 import { ProjectDeleteForm } from "@/components/ProjectDeleteForm";
 import { ProjectHandoffForm } from "@/components/ProjectHandoffForm";
+import { ProjectMergePrButton } from "@/components/ProjectMergePrButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
@@ -244,7 +245,7 @@ function buildWorkflowStepDetails(input: {
     ),
     merge: (
       <Stack gap="xs">
-        {renderMergeIssueRows(input.activeWorkflows)}
+        {renderMergeIssueRows(input.projectId, input.activeWorkflows)}
       </Stack>
     ),
     done: (
@@ -320,19 +321,24 @@ function renderQaIssueRows(workflows: WorkflowRecord[], sessions: AgentSessionRe
   });
 }
 
-function renderMergeIssueRows(workflows: WorkflowRecord[]): ReactNode {
+function renderMergeIssueRows(projectId: string, workflows: WorkflowRecord[]): ReactNode {
   const issues = workflows.flatMap((workflow) => workflow.issues).filter((issue) => hasAnyLabel(issue, ["qa-passed", "taskix:qa-passed", "taskix:ready-to-merge"]));
   if (!issues.length) return <Text size="xs" c="dimmed">No QA-passed or ready-to-merge issues yet.</Text>;
   return issues.map((issue) => (
     <div key={issue.issueId} className="workflow-job-row">
       <Group justify="space-between" gap="xs" wrap="nowrap">
-        <Text size="sm" fw={700} lineClamp={1}>{issue.title}</Text>
-        <Badge size="xs" color="green" variant="light">ready</Badge>
+        <div style={{ minWidth: 0 }}>
+          <Text size="sm" fw={700} lineClamp={1}>{issue.title}</Text>
+          <Text size="xs" c="dimmed" mt={4}>
+            {issue.githubIssueNumber ? `Issue #${issue.githubIssueNumber}` : issue.issueId}
+            {issue.prState ? ` · PR ${issue.prState}` : ""}
+          </Text>
+        </div>
+        <Group gap={6} wrap="nowrap">
+          <Badge size="xs" color="green" variant="light">ready</Badge>
+          {issue.prUrl && issue.prState !== "MERGED" ? <ProjectMergePrButton projectId={projectId} issueId={issue.issueId} /> : null}
+        </Group>
       </Group>
-      <Text size="xs" c="dimmed" mt={4}>
-        {issue.githubIssueNumber ? `Issue #${issue.githubIssueNumber}` : issue.issueId}
-        {issue.prState ? ` · PR ${issue.prState}` : ""}
-      </Text>
     </div>
   ));
 }

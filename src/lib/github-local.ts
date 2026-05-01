@@ -195,6 +195,10 @@ export async function removeLabelsWithGh(repo: string, target: number | string, 
   await execFileAsync("gh", ["issue", "edit", String(target), "--repo", repo, "--remove-label", labels.join(",")]);
 }
 
+export async function mergePullRequestWithGh(repo: string, prUrl: string): Promise<void> {
+  await execFileAsync("gh", ["pr", "merge", prUrl, "--repo", repo, "--merge"]);
+}
+
 export async function getIssueSnapshotWithGh(repo: string, issueNumber: number): Promise<GhIssueSnapshot> {
   const { stdout: issueStdout } = await execFileAsync("gh", ["issue", "view", String(issueNumber), "--repo", repo, "--json", "number,url,state,labels"]);
   const issue = JSON.parse(issueStdout) as { number: number; url: string; state: string; labels: Array<{ name: string }> };
