@@ -107,6 +107,7 @@ function getCurrentStep(input: {
   jobs: Pick<JobRecord, "status" | "type">[];
 }): WorkflowProgressStepId {
   if (!input.hasAnyWorkflow && !input.jobs.length) return "requirement";
+  if (!input.hasActiveWorkflow && input.hasDoneWorkflow) return "done";
   if (input.jobs.some((job) => job.status !== "done" && job.type === "workflow_run")) return "planning";
   if (input.jobs.some((job) => job.status !== "done" && job.type === "issue_run")) return "developer";
   if (input.issues.some((issue) => hasAnyIssueLabel(issue, ["taskix:ready-to-merge"]))) return "merge";
@@ -114,7 +115,6 @@ function getCurrentStep(input: {
   if (input.issues.some((issue) => issue.prUrl || issue.prState)) return "qa";
   if (input.issues.length) return "developer";
   if (input.hasActiveWorkflow) return "planning";
-  if (input.hasDoneWorkflow) return "done";
   return "requirement";
 }
 

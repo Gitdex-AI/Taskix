@@ -81,6 +81,17 @@ describe("getWorkflowProgress", () => {
     assert.equal(currentStep(steps).id, "merge");
   });
 
+  it("shows completed workflows on done even when issues retain QA-passed labels", () => {
+    const steps = getWorkflowProgress({
+      workflows: [workflow("done", [issue({ labels: ["qa-passed"], prLabels: ["taskix:ready-to-merge"], prState: "MERGED" })])],
+      jobs: []
+    });
+
+    assert.equal(currentStep(steps), undefined);
+    assert.equal(step(steps, "merge").status, "complete");
+    assert.equal(step(steps, "done").status, "complete");
+  });
+
   it("shows failed developer jobs as blocked", () => {
     const steps = getWorkflowProgress({
       workflows: [workflow("in_progress", [issue()])],
