@@ -16,6 +16,13 @@ import { getIssueQaStatus } from "@/lib/qa-status";
 import { getAgentSession, getProject, listAgentSessions, listJobs, listProjectWorkflows } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord, WorkflowRecord } from "@/lib/types";
 import { getWorkflowProgress, type WorkflowProgressStep } from "@/lib/workflow-progress";
+import {
+  hasAnyLabel,
+  recoveryReasonForDeveloperStep,
+  recoveryReasonForJobs,
+  recoveryReasonForMergeStep,
+  recoveryReasonForQaStep
+} from "@/lib/workflow-recovery";
 
 export default async function ProjectDetailPage({
   params,
@@ -351,41 +358,6 @@ function renderStepRecovery(input: {
   );
 }
 
-function recoveryReasonForJobs(jobs: JobRecord[]): string | null {
-  if (jobs.some((job) => job.status === "failed")) return "A planning job failed. Retry the failed job, or sync GitHub if issues were created before the failure.";
-  if (jobs.some((job) => job.status === "running")) return "Planning is running. If the status does not change after several minutes, sync state or retry after it is marked failed.";
-  return null;
-}
-
-function recoveryReasonForDeveloperStep(workflows: WorkflowRecord[], jobs: JobRecord[], sessions: AgentSessionRecord[]): string | null {
-  if (jobs.some((job) => job.status === "failed")) return "A developer job failed. Retry the failed job; if a branch or PR was already created, recover it from GitHub first.";
-  if (sessions.some((session) => session.status === "blocked")) return "A developer session is blocked. Open the session for the blocker details, then retry or recover the PR from GitHub.";
-  const issues = workflows.flatMap((workflow) => workflow.issues);
-  if (issues.some((issue) => issue.branch && !issue.prUrl)) return "Developer work has a branch but no recorded PR. Use GitHub sync to recover a PR that was created or finish PR creation manually.";
-  if (issues.some((issue) => hasAnyLabel(issue, ["taskix:dev-running"]) && !issue.prUrl)) return "Developer work is marked running without a PR. Sync GitHub to detect a partially completed PR, or retry the developer job.";
-  return null;
-}
-
-function recoveryReasonForQaStep(workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): string | null {
-  if (sessions.some((session) => session.status === "blocked")) return "QA is blocked or failed. Open the QA session for findings, then retry the developer fix path after the issue is updated.";
-  const issues = workflows.flatMap((workflow) => workflow.issues);
-  if (issues.some((issue) => (issue.prUrl || issue.prState?.toUpperCase() === "OPEN") && !hasAnyLabel(issue, ["taskix:need-qa", "taskix:qa-running", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:ready-to-merge"]))) {
-    return "A PR is open but QA labels are missing. Sync GitHub to recover labels, or request QA before this workflow can move forward.";
-  }
-  if (issues.some((issue) => issue.prUrl && hasAnyLabel(issue, ["taskix:need-qa", "taskix:qa-running"]))) {
-    return "A PR is waiting on QA labels. After QA finishes, sync GitHub so Taskix can move the workflow to pass/fail or merge readiness.";
-  }
-  return null;
-}
-
-function recoveryReasonForMergeStep(workflows: WorkflowRecord[]): string | null {
-  const issues = workflows.flatMap((workflow) => workflow.issues);
-  if (issues.some((issue) => hasAnyLabel(issue, ["qa-passed", "taskix:qa-passed", "taskix:ready-to-merge"]) && issue.prState !== "MERGED")) {
-    return "QA has passed and the PR is ready. Merge from this step, then sync GitHub if the issue or PR state does not update.";
-  }
-  return null;
-}
-
 function renderStepRunAction(projectId: string, jobs: JobRecord[], jobType: JobRecord["type"], label: string): ReactNode {
   const pendingCount = jobs.filter((job) => job.type === jobType && job.status === "pending").length;
   if (!pendingCount) return null;
@@ -558,11 +530,6 @@ function SessionLink({ session, archived = false }: { session: AgentSessionRecor
       {session.ownedPaths?.length ? <Text size="xs" c="dimmed" lineClamp={1}>Paths: {session.ownedPaths.join(", ")}</Text> : null}
     </a>
   );
-}
-
-function hasAnyLabel(issue: IssueRecord, expected: string[]): boolean {
-  const labels = new Set([...(issue.labels ?? []), ...(issue.prLabels ?? [])].map((label) => label.toLowerCase()));
-  return expected.some((label) => labels.has(label));
 }
 
 function WorkflowProgressList({
