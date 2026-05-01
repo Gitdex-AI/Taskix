@@ -407,9 +407,14 @@ function WorkflowProgressList({
             <Text fw={840}>Step {activeIndex + 1} of {steps.length}</Text>
             <Text size="sm" c="dimmed">{activeStep.label.replace(/^\d+\.\s*/, "")}</Text>
           </div>
-          <Badge color={workflowProgressStatusColor(activeStep.status)} variant="light">
-            {workflowProgressStatusLabel(activeStep.status)}
-          </Badge>
+          <Stack gap={6} align="flex-end">
+            <Badge color={workflowProgressStatusColor(activeStep.status)} variant="light">
+              {workflowProgressStatusLabel(activeStep.status)}
+            </Badge>
+            {nextAction.buttonLabel ? (
+              <ProjectRunJobsForm projectId={projectId} label={nextAction.buttonLabel} />
+            ) : null}
+          </Stack>
         </Group>
       </div>
       {workflows.length ? (

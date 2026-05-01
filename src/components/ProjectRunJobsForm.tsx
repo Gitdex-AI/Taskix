@@ -60,9 +60,9 @@ export function ProjectRunJobsForm({
     <Group gap={6} wrap="nowrap">
       <Button
         type="button"
-        variant="light"
-        size="xs"
-        radius="xl"
+        variant="filled"
+        size="sm"
+        radius="md"
         leftSection={<Play size={14} />}
         loading={pending}
         disabled={disabled}
