@@ -6,6 +6,8 @@ import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { developerRoleIds, developerRoleProfile, formatDeveloperRoleCatalog } from "@/lib/developer-roles";
 import { expectedDeveloperBaseBranch } from "@/lib/issue-run-policy";
+import { getActiveJobId } from "@/lib/job-runtime";
+import { touchJobRuntime } from "@/lib/store";
 import type { ArchitectPrReviewResult, ArchitectReviewResult, DeveloperIssueResult, DeveloperResult, IssueSpec, QaPrReviewResult, QaResult } from "@/lib/types";
 import { dataDir, rootDir } from "@/lib/paths";
 import type { Settings } from "@/lib/types";
@@ -616,6 +618,8 @@ Summarize code review outcome, merge readiness, and deployment status according 
       let stdout = "";
       let stderr = "";
       let settled = false;
+      const activeJobId = getActiveJobId();
+      if (activeJobId) void touchJobRuntime(activeJobId, { pid: child.pid ?? null });
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -624,9 +628,11 @@ Summarize code review outcome, merge readiness, and deployment status according 
       }, codexTimeoutMs);
       child.stdout.on("data", (chunk) => {
         stdout += String(chunk);
+        if (activeJobId) void touchJobRuntime(activeJobId, { output: true });
       });
       child.stderr.on("data", (chunk) => {
         stderr += String(chunk);
+        if (activeJobId) void touchJobRuntime(activeJobId, { output: true });
       });
       child.on("error", () => {
         if (settled) return;

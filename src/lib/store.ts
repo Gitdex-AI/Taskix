@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { deleteProjectLocalState } from "@/lib/project-delete";
 import type { AgentSessionRecord, JobRecord, JobType, ProjectRecord, Role, WorkflowRecord } from "@/lib/types";
 
-const RUNNING_JOB_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const RUNNING_JOB_TIMEOUT_MS = 15 * 60 * 1000;
 
 export async function listProjects(): Promise<ProjectRecord[]> {
   const rows = getDb().prepare("SELECT payload FROM projects ORDER BY created_at ASC").all() as { payload: string }[];
@@ -136,7 +136,28 @@ export async function saveJob(job: JobRecord): Promise<void> {
     .run(job.jobId, job.projectId ?? null, job.type, job.status, job.createdAt, job.updatedAt, JSON.stringify(job));
 }
 
+export async function getJob(jobId: string): Promise<JobRecord | null> {
+  const row = getDb().prepare("SELECT payload FROM jobs WHERE job_id = ?").get(jobId) as { payload: string } | undefined;
+  return row ? (JSON.parse(row.payload) as JobRecord) : null;
+}
+
+export async function touchJobRuntime(jobId: string, input: { pid?: number | null; output?: boolean } = {}): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job || job.status !== "running") return;
+  const now = new Date().toISOString();
+  job.runtime = {
+    ...(job.runtime ?? {}),
+    pid: input.pid ?? job.runtime?.pid ?? null,
+    startedAt: job.runtime?.startedAt ?? job.updatedAt ?? now,
+    lastHeartbeatAt: now,
+    lastOutputAt: input.output ? now : job.runtime?.lastOutputAt ?? null
+  };
+  job.updatedAt = now;
+  await saveJob(job);
+}
+
 export async function listJobs(projectId?: string): Promise<JobRecord[]> {
+  await recoverStaleRunningJobs(projectId);
   const rows = projectId
     ? getDb().prepare("SELECT payload FROM jobs WHERE project_id = ? ORDER BY created_at DESC").all(projectId) as { payload: string }[]
     : getDb().prepare("SELECT payload FROM jobs ORDER BY created_at DESC").all() as { payload: string }[];
@@ -154,7 +175,16 @@ export async function claimNextPendingJob(projectId?: string): Promise<JobRecord
   const job = JSON.parse(row.payload) as JobRecord;
   job.status = "running";
   job.attempts += 1;
-  job.updatedAt = new Date().toISOString();
+  const now = new Date().toISOString();
+  job.updatedAt = now;
+  job.runtime = {
+    ...(job.runtime ?? {}),
+    pid: null,
+    startedAt: now,
+    lastHeartbeatAt: now,
+    lastOutputAt: null,
+    finishedAt: null
+  };
   await saveJob(job);
   return job;
 }
@@ -167,12 +197,13 @@ async function recoverStaleRunningJobs(projectId?: string): Promise<void> {
 
   for (const row of rows) {
     const job = JSON.parse(row.payload) as JobRecord;
-    const updatedAt = new Date(job.updatedAt).getTime();
-    if (!Number.isFinite(updatedAt) || now - updatedAt < RUNNING_JOB_TIMEOUT_MS) continue;
+    const heartbeatAt = new Date(job.runtime?.lastHeartbeatAt ?? job.updatedAt).getTime();
+    if (!Number.isFinite(heartbeatAt) || now - heartbeatAt < RUNNING_JOB_TIMEOUT_MS) continue;
 
     job.status = "failed";
-    job.error = `Job timed out after ${Math.round(RUNNING_JOB_TIMEOUT_MS / 60000)} minutes without an update. Retry the workflow job.`;
+    job.error = `Job stalled after ${Math.round(RUNNING_JOB_TIMEOUT_MS / 60000)} minutes without Codex output or heartbeat. Retry the workflow job.`;
     job.updatedAt = new Date().toISOString();
+    job.runtime = { ...(job.runtime ?? {}), finishedAt: job.updatedAt };
     await saveJob(job);
   }
 }
