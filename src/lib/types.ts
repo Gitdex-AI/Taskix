@@ -206,6 +206,13 @@ export type JobRecord = {
   updatedAt: string;
   attempts: number;
   error?: string | null;
+  runtime?: {
+    pid?: number | null;
+    startedAt?: string | null;
+    lastHeartbeatAt?: string | null;
+    lastOutputAt?: string | null;
+    finishedAt?: string | null;
+  };
   payload: {
     workflowId: string;
     issueId?: string | null;

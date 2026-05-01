@@ -7,6 +7,7 @@ import { ProjectChatArea } from "@/components/ProjectChatArea";
 import { ProjectDeleteForm } from "@/components/ProjectDeleteForm";
 import { ProjectHandoffForm } from "@/components/ProjectHandoffForm";
 import { ProjectMergePrButton } from "@/components/ProjectMergePrButton";
+import { ProjectRetryJobButton } from "@/components/ProjectRetryJobButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
@@ -238,14 +239,14 @@ function buildWorkflowStepDetails(input: {
           </Alert>
         ) : null}
         {renderStepRunAction(input.projectId, input.jobs, "workflow_run", "Run Architect Planning")}
-        {renderJobRows(input.jobs.filter((job) => job.type === "workflow_run"), input.queuedJobId)}
+        {renderJobRows(input.projectId, input.jobs.filter((job) => job.type === "workflow_run"), input.queuedJobId)}
         {renderSessionRows(input.sessions.filter((session) => session.role === "architect"))}
       </Stack>
     ),
     developer: (
       <Stack gap="xs">
         {renderStepRunAction(input.projectId, input.jobs, "issue_run", "Run Developer Jobs")}
-        {renderJobRows(input.jobs.filter((job) => job.type === "issue_run"), input.queuedJobId)}
+        {renderJobRows(input.projectId, input.jobs.filter((job) => job.type === "issue_run"), input.queuedJobId)}
         {renderDeveloperIssueRows(input.visibleActiveWorkflows, input.sessions)}
         {renderSessionRows(developerSessions)}
       </Stack>
@@ -326,7 +327,7 @@ function renderWorkflowActionRows(projectId: string, workflows: WorkflowRecord[]
   ));
 }
 
-function renderJobRows(jobs: JobRecord[], queuedJobId: string | null): ReactNode {
+function renderJobRows(projectId: string, jobs: JobRecord[], queuedJobId: string | null): ReactNode {
   if (!jobs.length) return <Text size="xs" c="dimmed">No jobs recorded for this step.</Text>;
   return jobs.slice(0, 4).map((job) => (
     <div
@@ -336,11 +337,15 @@ function renderJobRows(jobs: JobRecord[], queuedJobId: string | null): ReactNode
     >
       <Group justify="space-between" gap="xs" wrap="nowrap">
         <Text size="sm" fw={700}>{job.type}</Text>
-        <Badge size="xs" variant="light">{job.status}</Badge>
+        <Group gap={6} wrap="nowrap">
+          <Badge size="xs" color={job.status === "failed" ? "red" : undefined} variant="light">{job.status}</Badge>
+          {job.status === "failed" ? <ProjectRetryJobButton projectId={projectId} jobId={job.jobId} /> : null}
+        </Group>
       </Group>
       <Text size="xs" c="dimmed" mt={4}>
         Job {job.jobId}
         {job.payload.workflowId ? ` · workflow ${job.payload.workflowId}` : ""}
+        {job.runtime?.lastHeartbeatAt ? ` · last heartbeat ${formatDate(job.runtime.lastHeartbeatAt)}` : ""}
         {job.error ? ` · ${job.error}` : ""}
       </Text>
     </div>
