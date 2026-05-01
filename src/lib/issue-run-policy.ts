@@ -1,7 +1,7 @@
 import type { ArchitectPrReviewResult } from "@/lib/types";
 
 export type LabelPlan = {
-  decision: "ready_to_merge" | "blocked" | "changes_requested";
+  decision: "ready_to_merge" | "blocked" | "changes_requested" | "merged";
   summary: string;
   labelsApplied: string[];
   labelsRemoved: string[];
@@ -27,6 +27,16 @@ export function manualDeployFinalLabelPlan(input: {
   prUrl: string;
   architectDecision: ArchitectPrReviewResult;
 }): LabelPlan {
+  if (input.architectDecision.decision === "merged") {
+    return {
+      decision: "merged",
+      summary: `${input.architectDecision.summary}\n\nManual-deploy project: ${input.prUrl} is already merged, so Taskix skipped ready-to-merge labeling.`,
+      labelsApplied: input.architectDecision.labelsApplied,
+      labelsRemoved: ["taskix:need-qa", "taskix:qa-running", "taskix:ready-to-merge", "taskix:blocked"],
+      comments: input.architectDecision.comments
+    };
+  }
+
   if (input.architectDecision.decision !== "ready_to_merge") {
     return {
       decision: input.architectDecision.decision === "changes_requested" ? "changes_requested" : "blocked",
@@ -63,8 +73,8 @@ export function manualDeployArchitectPolicyDecision(input: {
   }
   if (input.prMerged || state === "MERGED") {
     return {
-      decision: "blocked",
-      summary: `Architect policy blocked ${input.prUrl}: PR is already merged.`,
+      decision: "merged",
+      summary: `Architect policy observed ${input.prUrl} is already merged; ready-to-merge labeling is skipped.`,
       labelsApplied: [],
       comments: []
     };

@@ -61,7 +61,17 @@ const mergedBlocked = manualDeployArchitectPolicyDecision({
   prMerged: true
 });
 
-assert.equal(mergedBlocked.decision, "blocked");
+assert.equal(mergedBlocked.decision, "merged");
 assert.match(mergedBlocked.summary, /already merged/);
+
+const mergedPlan = manualDeployFinalLabelPlan({
+  prUrl: "https://github.com/Taskix-AI/Taskix/pull/999",
+  architectDecision: mergedBlocked
+});
+
+assert.equal(mergedPlan.decision, "merged");
+assert.deepEqual(mergedPlan.labelsApplied, []);
+assert.deepEqual(mergedPlan.labelsRemoved, ["taskix:need-qa", "taskix:qa-running", "taskix:ready-to-merge", "taskix:blocked"]);
+assert.match(mergedPlan.summary, /skipped ready-to-merge labeling/);
 
 console.log("issue-run policy simulation passed");
