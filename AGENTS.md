@@ -79,6 +79,7 @@ Planning-only safe main-flow smoke recheck for Issue 15:
 - Workflow ID: `WF-20260430-004`
 - Planning issue: https://github.com/Taskix-AI/Taskix/issues/32
 - Scope: documentation-only planning for a safe main-flow smoke recheck; no deployment work is in scope
+- Issue 36 manual-deploy note: no deploy is performed in this project, and after the developer PR plus QA pass the flow stops at `ready_to_merge` with the PR left open.
 - Execution stop point: implementation stops after planning is documented in repository guidance
 - Job handling: any `issue_run` jobs are only queued for later manual Run Jobs execution and are not executed as part of this work
 
