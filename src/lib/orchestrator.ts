@@ -577,8 +577,28 @@ async function requestInitialPrReview(project: ProjectRecord, issue: IssueRecord
 
 async function requestFinalPrReview(project: ProjectRecord, issue: IssueRecord, prUrl: string, codex: CodexClient) {
   if (!project.autoDeploy && issue.githubIssueNumber) {
+    const architectDecision = await codex.architectConfirmManualReady({
+      repo: project.githubRepo,
+      issueNumber: issue.githubIssueNumber,
+      prUrl
+    });
+    if (architectDecision.decision !== "ready_to_merge") {
+      const addLabels = ["taskix:blocked"];
+      const removeLabels = ["taskix:qa-running", "taskix:ready-to-merge"];
+      await Promise.all([
+        addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, addLabels),
+        addLabelsWithGh(project.githubRepo, prUrl, addLabels),
+        removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, removeLabels),
+        removeLabelsWithGh(project.githubRepo, prUrl, removeLabels)
+      ]);
+      return {
+        ...architectDecision,
+        labelsApplied: [...new Set([...architectDecision.labelsApplied, ...addLabels])]
+      };
+    }
+
     const addLabels = ["taskix:ready-to-merge"];
-    const removeLabels = ["taskix:need-qa", "taskix:qa-running"];
+    const removeLabels = ["taskix:need-qa", "taskix:qa-running", "taskix:blocked"];
     await Promise.all([
       addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, addLabels),
       addLabelsWithGh(project.githubRepo, prUrl, addLabels),
@@ -587,9 +607,9 @@ async function requestFinalPrReview(project: ProjectRecord, issue: IssueRecord, 
     ]);
     return {
       decision: "ready_to_merge" as const,
-      summary: `Manual-deploy project: QA passed and Taskix marked ${prUrl} ready to merge without merging it.`,
-      labelsApplied: addLabels,
-      comments: []
+      summary: `${architectDecision.summary}\n\nManual-deploy project: architect approved merge readiness after QA; Taskix marked ${prUrl} ready to merge without merging it.`,
+      labelsApplied: [...new Set([...architectDecision.labelsApplied, ...addLabels])],
+      comments: architectDecision.comments
     };
   }
 

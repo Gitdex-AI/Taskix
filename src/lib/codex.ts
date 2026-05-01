@@ -378,6 +378,44 @@ Return JSON with decision, summary, labelsApplied, comments.`;
     };
   }
 
+  async architectConfirmManualReady(input: {
+    repo: string;
+    issueNumber: number;
+    prUrl: string;
+  }): Promise<ArchitectPrReviewResult> {
+    const schema = objectSchema({
+      decision: { type: "string", enum: ["ready_to_merge", "changes_requested", "blocked"] },
+      summary: { type: "string" },
+      labelsApplied: { type: "array", items: { type: "string" } },
+      comments: { type: "array", items: { type: "string" } }
+    });
+    const prompt = `${rolePrompts.architect}
+
+GitHub repo: ${input.repo}
+Issue: #${input.issueNumber}
+PR: ${input.prUrl}
+Project deployment policy: manual deploy; do not merge.
+
+You are the architect and own final merge-readiness review after QA has passed.
+
+Rules:
+- Read the linked issue, PR diff, labels, and QA result with gh.
+- Decide whether the PR is ready to merge, needs changes, or is blocked.
+- Do not merge the PR.
+- Do not add or remove GitHub labels; Taskix will apply labels after your structured decision.
+- Return "ready_to_merge" only when QA has passed and the PR satisfies the issue acceptance criteria.
+- Return "changes_requested" if implementation changes are required.
+- Return "blocked" if readiness cannot be determined from available GitHub state.
+
+Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied to an empty array.`;
+    return (await this.runJson<ArchitectPrReviewResult>(prompt, schema)) ?? {
+      decision: "blocked",
+      summary: `Architect runner did not complete manual ready review for ${input.prUrl}.`,
+      labelsApplied: [],
+      comments: []
+    };
+  }
+
   async qaReviewPr(input: {
     repo: string;
     issueNumber: number;
