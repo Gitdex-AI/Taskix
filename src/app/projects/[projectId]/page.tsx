@@ -6,6 +6,7 @@ import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
 import { ProjectChatArea } from "@/components/ProjectChatArea";
 import { ProjectDeleteForm } from "@/components/ProjectDeleteForm";
 import { ProjectHandoffForm } from "@/components/ProjectHandoffForm";
+import { ProjectMergePrButton } from "@/components/ProjectMergePrButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
@@ -48,19 +49,24 @@ export default async function ProjectDetailPage({
   const queuedWorkflow = queuedWorkflowId ? workflows.find((workflow) => workflow.workflowId === queuedWorkflowId) ?? null : null;
   const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
+  const workflowPanelWorkflows = visibleActiveWorkflows.length ? visibleActiveWorkflows : doneWorkflows.slice(0, 3);
+  const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
+  const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
+  const workflowPanelDynamicSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && !session.archivedAt);
+  const workflowPanelArchivedSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && session.archivedAt);
   const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
-  const nextAction = getWorkflowNextAction(jobs);
-  const workflowProgress = getWorkflowProgress({ workflows, jobs });
+  const nextAction = getWorkflowNextAction(workflowPanelJobs);
+  const workflowProgress = getWorkflowProgress({ workflows: workflowPanelWorkflows, jobs: workflowPanelJobs });
   const workflowStepDetails = buildWorkflowStepDetails({
     projectId: project.projectId,
     isInspectingIssueSession,
     readyForArchitectPayload,
     pmSession,
-    sessions,
-    dynamicSessions,
-    archivedSessions,
-    jobs,
-    activeWorkflows,
+    sessions: workflowPanelSessions,
+    dynamicSessions: workflowPanelDynamicSessions,
+    archivedSessions: workflowPanelArchivedSessions,
+    jobs: workflowPanelJobs,
+    activeWorkflows: visibleActiveWorkflows,
     doneWorkflows,
     visibleActiveWorkflows,
     queuedWorkflow,
@@ -144,7 +150,7 @@ export default async function ProjectDetailPage({
                 steps={workflowProgress}
                 nextAction={nextAction}
                 projectId={project.projectId}
-                activeWorkflows={visibleActiveWorkflows}
+                workflows={workflowPanelWorkflows}
                 stepDetails={workflowStepDetails}
               />
             </Stack>
@@ -162,6 +168,27 @@ function prioritizeById<T extends { workflowId?: string; jobId?: string }>(items
     const rightSelected = right.workflowId === selectedId || right.jobId === selectedId;
     if (leftSelected === rightSelected) return 0;
     return leftSelected ? -1 : 1;
+  });
+}
+
+function filterJobsForWorkflows(jobs: JobRecord[], workflows: WorkflowRecord[]): JobRecord[] {
+  const workflowIds = new Set(workflows.map((workflow) => workflow.workflowId));
+  if (!workflowIds.size) return [];
+  return jobs.filter((job) => workflowIds.has(job.payload.workflowId));
+}
+
+function filterSessionsForWorkflows(sessions: AgentSessionRecord[], workflows: WorkflowRecord[]): AgentSessionRecord[] {
+  const workflowIds = new Set(workflows.map((workflow) => workflow.workflowId));
+  const issueSessionIds = new Set(
+    workflows.flatMap((workflow) => workflow.issues.flatMap((issue) => [issue.issueId, issue.developerSessionId, issue.qaSessionId].filter(Boolean) as string[]))
+  );
+  if (!workflowIds.size) return sessions.filter((session) => session.role === "product_manager" || session.role === "architect" || session.role === "devops");
+
+  return sessions.filter((session) => {
+    if (session.role === "product_manager" || session.role === "architect" || session.role === "devops") return true;
+    if (session.workflowId && workflowIds.has(session.workflowId)) return true;
+    if (session.issueId && issueSessionIds.has(session.issueId)) return true;
+    return issueSessionIds.has(session.sessionKey);
   });
 }
 
@@ -229,7 +256,7 @@ function buildWorkflowStepDetails(input: {
     ),
     merge: (
       <Stack gap="xs">
-        {renderMergeIssueRows(input.activeWorkflows)}
+        {renderMergeIssueRows(input.projectId, input.activeWorkflows)}
       </Stack>
     ),
     done: (
@@ -242,7 +269,7 @@ function buildWorkflowStepDetails(input: {
 }
 
 function renderWorkflowActionRows(projectId: string, workflows: WorkflowRecord[]): ReactNode {
-  if (!workflows.length) return <Text size="xs" c="dimmed">No active workflow controls for this step.</Text>;
+  if (!workflows.length) return <Text size="xs" c="dimmed">No workflow entries for this project yet.</Text>;
   return workflows.map((workflow) => (
     <div key={workflow.workflowId} className="workflow-control-row">
       <div>
@@ -259,7 +286,7 @@ function renderWorkflowActionRows(projectId: string, workflows: WorkflowRecord[]
         >
           Open
         </Button>
-        <WorkflowPauseButton workflowId={workflow.workflowId} paused={Boolean(workflow.paused)} />
+        {workflow.status !== "done" ? <WorkflowPauseButton workflowId={workflow.workflowId} paused={Boolean(workflow.paused)} /> : null}
       </Group>
     </div>
   ));
@@ -305,19 +332,24 @@ function renderQaIssueRows(workflows: WorkflowRecord[], sessions: AgentSessionRe
   });
 }
 
-function renderMergeIssueRows(workflows: WorkflowRecord[]): ReactNode {
+function renderMergeIssueRows(projectId: string, workflows: WorkflowRecord[]): ReactNode {
   const issues = workflows.flatMap((workflow) => workflow.issues).filter((issue) => hasAnyLabel(issue, ["qa-passed", "taskix:qa-passed", "taskix:ready-to-merge"]));
   if (!issues.length) return <Text size="xs" c="dimmed">No QA-passed or ready-to-merge issues yet.</Text>;
   return issues.map((issue) => (
     <div key={issue.issueId} className="workflow-job-row">
       <Group justify="space-between" gap="xs" wrap="nowrap">
-        <Text size="sm" fw={700} lineClamp={1}>{issue.title}</Text>
-        <Badge size="xs" color="green" variant="light">ready</Badge>
+        <div style={{ minWidth: 0 }}>
+          <Text size="sm" fw={700} lineClamp={1}>{issue.title}</Text>
+          <Text size="xs" c="dimmed" mt={4}>
+            {issue.githubIssueNumber ? `Issue #${issue.githubIssueNumber}` : issue.issueId}
+            {issue.prState ? ` · PR ${issue.prState}` : ""}
+          </Text>
+        </div>
+        <Group gap={6} wrap="nowrap">
+          <Badge size="xs" color="green" variant="light">ready</Badge>
+          {issue.prUrl && issue.prState !== "MERGED" ? <ProjectMergePrButton projectId={projectId} issueId={issue.issueId} /> : null}
+        </Group>
       </Group>
-      <Text size="xs" c="dimmed" mt={4}>
-        {issue.githubIssueNumber ? `Issue #${issue.githubIssueNumber}` : issue.issueId}
-        {issue.prState ? ` · PR ${issue.prState}` : ""}
-      </Text>
     </div>
   ));
 }
@@ -397,13 +429,13 @@ function WorkflowProgressList({
   steps,
   nextAction,
   projectId,
-  activeWorkflows,
+  workflows,
   stepDetails
 }: {
   steps: WorkflowProgressStep[];
   nextAction: WorkflowNextAction;
   projectId: string;
-  activeWorkflows: WorkflowRecord[];
+  workflows: WorkflowRecord[];
   stepDetails: Record<WorkflowProgressStep["id"], ReactNode>;
 }) {
   const activeIndex = getActiveWorkflowStepIndex(steps);
@@ -418,16 +450,21 @@ function WorkflowProgressList({
             <Text fw={840}>Step {activeIndex + 1} of {steps.length}</Text>
             <Text size="sm" c="dimmed">{activeStep.label.replace(/^\d+\.\s*/, "")}</Text>
           </div>
-          <Badge color={workflowProgressStatusColor(activeStep.status)} variant="light">
-            {workflowProgressStatusLabel(activeStep.status)}
-          </Badge>
+          <Stack gap={6} align="flex-end">
+            <Badge color={workflowProgressStatusColor(activeStep.status)} variant="light">
+              {workflowProgressStatusLabel(activeStep.status)}
+            </Badge>
+            {nextAction.buttonLabel ? (
+              <ProjectRunJobsForm projectId={projectId} label={nextAction.buttonLabel} />
+            ) : null}
+          </Stack>
         </Group>
       </div>
-      {activeWorkflows.length ? (
+      {workflows.length ? (
         <div className="workflow-progress-controls">
-          <Text size="xs" fw={800} tt="uppercase" c="dimmed">Workflow controls</Text>
+          <Text size="xs" fw={800} tt="uppercase" c="dimmed">Workflow entries</Text>
           <Stack gap="xs" mt="xs">
-            {renderWorkflowActionRows(projectId, activeWorkflows)}
+            {renderWorkflowActionRows(projectId, workflows)}
           </Stack>
         </div>
       ) : null}

@@ -262,7 +262,7 @@ pre,
 
 .project-chat-layout {
   display: grid;
-  grid-template-columns: minmax(520px, 1fr) minmax(430px, 34vw);
+  grid-template-columns: minmax(480px, 1fr) minmax(520px, clamp(520px, 40vw, 680px));
   gap: 18px;
   align-items: start;
 }
@@ -870,6 +870,17 @@ pre,
   overscroll-behavior: contain;
   padding-right: 2px;
   scrollbar-gutter: stable;
+}
+
+@media (max-width: 1320px) {
+  .project-chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .project-context {
+    position: static;
+    max-height: none;
+  }
 }
 
 @media (max-width: 1180px) {
