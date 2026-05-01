@@ -220,7 +220,7 @@ body {
 
 .project-chat-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(520px, 1fr) minmax(430px, 34vw);
   gap: 18px;
   align-items: start;
 }
@@ -767,7 +767,7 @@ body {
   scrollbar-gutter: stable;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1180px) {
   .layout {
     grid-template-columns: 1fr;
   }
