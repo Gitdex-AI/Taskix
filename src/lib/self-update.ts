@@ -30,6 +30,7 @@ export type SelfUpdateState = {
 };
 
 type CommandRunner = (command: SelfUpdateCommand, cwd: string) => Promise<SelfUpdateCommandResult>;
+type RequestSource = Headers | { headers: Headers; ip?: string | null; remoteAddress?: string | null };
 
 const updateCommands: SelfUpdateCommand[] = [
   { command: "git pull", bin: "git", args: ["pull"] },
@@ -61,19 +62,8 @@ export function isLocalhostAddress(value: string | null | undefined) {
   );
 }
 
-export function isLocalhostRequest(headers: Headers) {
-  const forwardedFor = headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const firstForwardedAddress = forwardedFor.split(",")[0]?.trim();
-    if (!isLocalhostAddress(firstForwardedAddress)) {
-      return false;
-    }
-  }
-
-  return (
-    isLocalhostAddress(headers.get("x-real-ip")) ||
-    isLocalhostAddress(forwardedFor?.split(",")[0])
-  );
+export function isLocalhostRequest(source: RequestSource) {
+  return isLocalhostAddress(getRuntimeRemoteAddress(source));
 }
 
 export function getSelfUpdateState(): SelfUpdateState {
@@ -84,7 +74,7 @@ export function getSelfUpdateState(): SelfUpdateState {
   };
 }
 
-export function selfUpdateGuard(headers: Headers) {
+export function selfUpdateGuard(source: RequestSource) {
   if (!isSelfUpdateEnabled()) {
     return {
       ok: false as const,
@@ -93,7 +83,7 @@ export function selfUpdateGuard(headers: Headers) {
     };
   }
 
-  if (!isLocalhostRequest(headers)) {
+  if (!isLocalhostRequest(source)) {
     return {
       ok: false as const,
       status: 403,
@@ -102,6 +92,15 @@ export function selfUpdateGuard(headers: Headers) {
   }
 
   return { ok: true as const };
+}
+
+function getRuntimeRemoteAddress(source: RequestSource) {
+  if (source instanceof Headers) {
+    // Host and forwarding headers are caller-controlled in this route context, so header-only checks fail closed.
+    return null;
+  }
+
+  return source.ip || source.remoteAddress || null;
 }
 
 export async function runSelfUpdate(cwd = process.cwd()): Promise<SelfUpdateRunResult> {

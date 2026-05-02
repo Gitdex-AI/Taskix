@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runSelfUpdate, selfUpdateGuard } from "@/lib/self-update";
 
 export async function POST(request: NextRequest) {
-  const guard = selfUpdateGuard(request.headers);
+  const guard = selfUpdateGuard(request);
   if (!guard.ok) {
     return NextResponse.json({ error: guard.error }, { status: guard.status });
   }

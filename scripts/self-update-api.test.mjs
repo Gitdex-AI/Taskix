@@ -60,10 +60,18 @@ test("host headers do not prove a localhost caller", () => {
   assert.equal(selfUpdateGuard(new Headers({ host: "127.0.0.1:8000" })).ok, false);
 });
 
+test("forwarding headers do not prove a localhost caller", () => {
+  process.env.TASKIX_ENABLE_SELF_UPDATE = "true";
+
+  assert.equal(isLocalhostRequest(new Headers({ "x-forwarded-for": "127.0.0.1" })), false);
+  assert.equal(isLocalhostRequest(new Headers({ "x-real-ip": "127.0.0.1" })), false);
+  assert.equal(selfUpdateGuard(new Headers({ "x-forwarded-for": "127.0.0.1" })).ok, false);
+});
+
 test("localhost detection accepts loopback address forms", () => {
-  assert.equal(isLocalhostRequest(new Headers({ "x-forwarded-for": "127.0.0.1" })), true);
-  assert.equal(isLocalhostRequest(new Headers({ "x-real-ip": "::1" })), true);
-  assert.equal(isLocalhostRequest(new Headers({ "x-forwarded-for": "::ffff:127.0.0.1" })), true);
+  assert.equal(isLocalhostRequest(localRequest("127.0.0.1")), true);
+  assert.equal(isLocalhostRequest(localRequest("::1")), true);
+  assert.equal(isLocalhostRequest(localRequest("::ffff:127.0.0.1")), true);
 });
 
 test("successful update runs commands in order and enables restart", async () => {
@@ -107,5 +115,9 @@ test("failed command stops later commands and keeps restart unavailable", async 
 });
 
 function localHeaders() {
-  return new Headers({ "x-forwarded-for": "127.0.0.1", host: "127.0.0.1:8000" });
+  return localRequest("127.0.0.1");
+}
+
+function localRequest(ip) {
+  return { headers: new Headers(), ip };
 }
