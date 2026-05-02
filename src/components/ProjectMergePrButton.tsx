@@ -1,14 +1,13 @@
 "use client";
 
-import { Alert, Anchor, Button, Group, Stack, Text } from "@mantine/core";
-import { AlertTriangle, ExternalLink, GitPullRequestArrow } from "lucide-react";
+import { Button, Text } from "@mantine/core";
+import { GitPullRequestArrow } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function ProjectMergePrButton({
   projectId,
-  issueId,
-  prUrl
+  issueId
 }: {
   projectId: string;
   issueId: string;
@@ -16,35 +15,22 @@ export function ProjectMergePrButton({
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
-  const [result, setResult] = useState<MergeResult | null>(null);
+  const [error, setError] = useState("");
 
   async function mergePr() {
     setPending(true);
-    setResult(null);
+    setError("");
     try {
       const response = await fetch(`/api/projects/${projectId}/issues/${issueId}/merge`, { method: "POST" });
       const payload = await response.json() as MergeResponse;
       if (!response.ok) {
-        setResult({
-          ok: false,
-          message: payload.error ?? "Architect handoff failed",
-          action: payload.action,
-          architectUrl: payload.architectUrl,
-          prUrl: payload.prUrl ?? prUrl,
-          mergeable: payload.mergeable
-        });
+        setError([payload.error ?? "Run Merge failed", payload.mergeable ? `GitHub mergeable state: ${payload.mergeable}.` : "", payload.action].filter(Boolean).join(" "));
         return;
       }
-      setResult({
-        ok: true,
-        message: "Architect merge queued",
-        architectUrl: payload.architectUrl,
-        prUrl: payload.prUrl ?? prUrl
-      });
       if (payload.jobId) runQueuedJob(payload.jobId);
       router.refresh();
     } catch (error) {
-      setResult({ ok: false, message: error instanceof Error ? error.message : "Architect handoff failed", prUrl });
+      setError(error instanceof Error ? error.message : "Run Merge failed");
     } finally {
       setPending(false);
     }
@@ -56,8 +42,8 @@ export function ProjectMergePrButton({
         if (!response.ok) throw new Error(await response.text());
       })
       .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : "Architect handoff failed";
-        if (!message.includes("not pending")) setResult({ ok: false, message, prUrl });
+        const message = error instanceof Error ? error.message : "Run Merge failed";
+        if (!message.includes("not pending")) setError(message);
       })
       .finally(() => {
         router.refresh();
@@ -66,53 +52,12 @@ export function ProjectMergePrButton({
   }
 
   return (
-    <Stack gap={6} className="merge-pr-control">
-      <Group gap={6} wrap="nowrap">
-        <Button
-          type="button"
-          color="green"
-          variant="filled"
-          size="sm"
-          radius="md"
-          leftSection={<GitPullRequestArrow size={14} />}
-          loading={pending}
-          onClick={mergePr}
-        >
-          Run Merge
-        </Button>
-        {result?.ok ? <Text size="xs" c="green">{result.message}</Text> : null}
-      </Group>
-      {result?.ok && result.architectUrl ? (
-        <Button component="a" href={result.architectUrl} size="compact-xs" variant="light" color="green" radius="xl">
-          Open architect session
-        </Button>
-      ) : null}
-      {result && !result.ok ? (
-        <Alert className="merge-pr-error" color="red" variant="light" icon={<AlertTriangle size={16} />}>
-          <Stack gap={4}>
-            <Text size="xs" fw={760}>Architect handoff failed</Text>
-            <Text size="xs">{result.message}</Text>
-            {result.mergeable ? <Text size="xs" c="dimmed">GitHub mergeable state: {result.mergeable}</Text> : null}
-            {result.action ? <Text size="xs" c="dimmed">{result.action}</Text> : null}
-            <Group gap="xs">
-              {result.architectUrl ? (
-                <Button component="a" href={result.architectUrl} size="compact-xs" variant="light" color="red" radius="xl">
-                  Open architect session
-                </Button>
-              ) : null}
-              {result.prUrl ? (
-                <Anchor size="xs" href={result.prUrl} target="_blank" rel="noreferrer">
-                  <Group gap={4} component="span">
-                    <ExternalLink size={12} />
-                    Open pull request
-                  </Group>
-                </Anchor>
-              ) : null}
-            </Group>
-          </Stack>
-        </Alert>
-      ) : null}
-    </Stack>
+    <>
+      <Button type="button" color="green" variant="filled" size="compact-xs" radius="xl" leftSection={<GitPullRequestArrow size={14} />} loading={pending} onClick={mergePr}>
+        Run Merge
+      </Button>
+      {error ? <Text size="xs" c="red" maw={220}>{error}</Text> : null}
+    </>
   );
 }
 
@@ -121,15 +66,6 @@ type MergeResponse = {
   action?: string;
   architectUrl?: string;
   jobId?: string;
-  prUrl?: string | null;
-  mergeable?: string | null;
-};
-
-type MergeResult = {
-  ok: boolean;
-  message: string;
-  action?: string;
-  architectUrl?: string;
   prUrl?: string | null;
   mergeable?: string | null;
 };
