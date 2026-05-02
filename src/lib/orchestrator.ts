@@ -6,6 +6,7 @@ import { GitHubClient } from "@/lib/github";
 import { addLabelsWithGh, commentIssueWithGh, commentPullRequestWithGh, createIssueWithGh, createPullRequestWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { expectedDeveloperBaseBranch, expectedDeveloperBranch, isRecoverablePrBase, prRecoveryBranches } from "@/lib/issue-run-policy";
 import { getSettings } from "@/lib/settings";
+import { normalizeQaFailureType } from "@/lib/spec-blocker";
 import { appendAgentMessages, cancelPendingJobs, createJob, listJobs, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { DeveloperIssueResult, IssueRecord, IssueSpec, ProjectRecord, QaPrReviewResult, WorkflowRecord } from "@/lib/types";
 
@@ -183,10 +184,12 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
     headSha: qaHeadSha
   });
   const qaFinishedAt = new Date().toISOString();
+  const qaFailureType = normalizeQaFailureType(qaResult);
+  qaResult.failureType = qaFailureType;
   const qaCloseAt = qaResult.passed ? qaFinishedAt : null;
   const appliedLabels = qaResult.passed
     ? ["taskix:qa-passed"]
-    : qaResult.failureType === "spec"
+    : qaFailureType === "spec"
       ? ["taskix:spec-blocked", "taskix:blocked"]
       : ["taskix:qa-failed"];
   const qaStateLabels = ["qa-passed", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:ready-to-merge"];
@@ -204,7 +207,7 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
       issueId: issue.issueId,
       ownedPaths: issueOwnedPaths,
       status: qaResult.passed ? "done" : "blocked",
-      currentStep: qaResult.passed ? "QA passed" : qaResult.failureType === "spec" ? "QA blocked by issue specification" : "QA failed",
+      currentStep: qaResult.passed ? "QA passed" : qaFailureType === "spec" ? "QA blocked by issue specification" : "QA failed",
       startedAt: qaStartedAt,
       finishedAt: qaFinishedAt,
       durationMs: Math.max(0, new Date(qaFinishedAt).getTime() - new Date(qaStartedAt).getTime()),
@@ -229,7 +232,7 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
 
   workflow.timeline.push(qaResult.passed
     ? `QA passed PR for issue ${issue.issueId}. Awaiting architect merge handoff.`
-    : qaResult.failureType === "spec"
+    : qaFailureType === "spec"
       ? `QA marked ${issue.issueId} spec-blocked for architect clarification: ${qaResult.summary}`
       : `QA failed PR for issue ${issue.issueId}: ${qaResult.summary}`);
   workflow.status = deriveWorkflowStatus(workflow);

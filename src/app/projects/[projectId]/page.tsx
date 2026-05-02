@@ -22,6 +22,7 @@ import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
 import { findReadyForArchitectPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
 import { getIssueQaStatus } from "@/lib/qa-status";
+import { isIssueSpecBlocked } from "@/lib/spec-blocker";
 import { getAgentSession, getProject, listAgentSessions, listJobs, listProjectWorkflows } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord, WorkflowRecord } from "@/lib/types";
 import { getWorkflowProgress, type WorkflowProgressStep } from "@/lib/workflow-progress";
@@ -712,7 +713,7 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
     const reviewed = hasAnyLabel(issue, ["taskix:ready-to-merge"]);
     const qaPassed = hasAnyLabel(issue, ["qa-passed", "taskix:qa-passed"]);
     const canHandoffToQa = Boolean(issue.prUrl) && qaStatus.id === "not_requested";
-    const qaSpecBlocked = qaStatus.id === "spec_blocked";
+    const qaSpecBlocked = isIssueSpecBlocked(issue, qaSession);
     const canArchitectReview = Boolean(issue.prUrl) && qaPassed && !reviewed && issue.prState !== "MERGED";
     const canMerge = Boolean(issue.prUrl) && reviewed && issue.prState !== "MERGED";
     const activeJob = latestIssueJob(issue.issueId, jobs);
