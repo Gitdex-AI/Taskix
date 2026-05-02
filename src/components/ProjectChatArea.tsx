@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { chatRoleLabel, parseChatTarget } from "@/lib/chat-routing";
-import type { AgentMessage, AgentSessionRecord } from "@/lib/types";
+import type { AgentMessage, AgentSessionRecord, JobRecord } from "@/lib/types";
 
 type TimelineMessage = AgentMessage & {
   kind: "message";
@@ -27,11 +27,13 @@ type TimelineExecutionLog = NonNullable<AgentSessionRecord["executionLogs"]>[num
 export function ProjectChatArea({
   projectId,
   sessions,
+  jobs,
   inspectedSession,
   readOnly
 }: {
   projectId: string;
   sessions: AgentSessionRecord[];
+  jobs: JobRecord[];
   inspectedSession: AgentSessionRecord | null;
   readOnly: boolean;
 }) {
@@ -51,7 +53,7 @@ export function ProjectChatArea({
     const scroll = scrollRef.current;
     if (!scroll) return;
     scroll.scrollTop = scroll.scrollHeight;
-  }, [visibleSessions, optimisticMessage?.createdAt, pending]);
+  }, [visibleSessions, optimisticMessage?.createdAt, pending, jobs]);
 
   async function submitMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,6 +98,7 @@ export function ProjectChatArea({
   return (
     <>
       <div ref={scrollRef} className="chat-scroll">
+        <RunningAgentStatus jobs={jobs} sessions={visibleSessions} />
         <MessageList projectId={projectId} sessions={visibleSessions} inspectedSession={readOnly ? inspectedSession : null} optimisticMessage={optimisticMessage} pending={pending} />
       </div>
       {!readOnly && (
@@ -135,6 +138,58 @@ export function ProjectChatArea({
       )}
     </>
   );
+}
+
+function RunningAgentStatus({ jobs, sessions }: { jobs: JobRecord[]; sessions: AgentSessionRecord[] }) {
+  const runningJobs = jobs.filter((job) => job.status === "running");
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!runningJobs.length) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [runningJobs.length]);
+
+  if (!runningJobs.length) return null;
+
+  return (
+    <div className="running-agent-status" aria-live="polite">
+      <Group gap={8} wrap="wrap">
+        <Badge variant="light" color="blue">{runningJobs.length} running</Badge>
+        {runningJobs.map((job) => {
+          const session = findJobSession(job, sessions);
+          const label = runningAgentLabel(job, session);
+          const startedAt = job.runtime?.startedAt ?? job.updatedAt ?? job.createdAt;
+          return (
+            <span key={job.jobId} className="running-agent-pill">
+              <LoaderCircle size={13} className="chat-composer-spinner" />
+              <span>{label} thinking ...({formatElapsed(startedAt)})</span>
+            </span>
+          );
+        })}
+      </Group>
+    </div>
+  );
+}
+
+function findJobSession(job: JobRecord, sessions: AgentSessionRecord[]): AgentSessionRecord | null {
+  if (!job.payload.issueId) {
+    if (job.type === "workflow_run") return sessions.find((session) => session.role === "architect" && session.workflowId === job.payload.workflowId) ?? null;
+    return null;
+  }
+  const expectedRole = job.type === "qa_run" ? "qa" : "developer";
+  return sessions.find((session) => session.role === expectedRole && session.issueId === job.payload.issueId) ?? null;
+}
+
+function runningAgentLabel(job: JobRecord, session: AgentSessionRecord | null): string {
+  if (session?.developerRole) return session.developerRole;
+  if (session?.role === "developer") return "Dev";
+  if (session?.role === "qa") return "QA";
+  if (session?.role === "architect") return "Architect";
+  if (job.type === "issue_run") return "Dev";
+  if (job.type === "qa_run") return "QA";
+  if (job.type === "workflow_run") return "Architect";
+  return "Agent";
 }
 
 function MessageList({
@@ -368,4 +423,10 @@ function formatDuration(durationMs: number): string {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+}
+
+function formatElapsed(value: string): string {
+  const startedAt = new Date(value).getTime();
+  if (Number.isNaN(startedAt)) return "0s";
+  return formatDuration(Date.now() - startedAt).replace(" ", "");
 }
