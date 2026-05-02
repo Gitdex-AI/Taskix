@@ -286,7 +286,6 @@ function ThreePhaseWorkflowPanel(input: {
           </div>
         </Group>
         <Stack gap="xs" mt="sm">
-          {input.pmSession ? <SessionLink session={input.pmSession} /> : <Text size="xs" c="dimmed">No PM session has been recorded yet.</Text>}
           {!input.isInspectingIssueSession && input.readyForArchitectPayload ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} /> : null}
           {renderRequirementRows(input.projectId, input.requirementWorkflows, input.jobs)}
         </Stack>
