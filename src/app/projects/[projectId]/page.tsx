@@ -838,7 +838,7 @@ function RunningActionButton({ label }: { label: string }): ReactNode {
 
 function latestIssueJob(issueId: string, jobs: JobRecord[], type?: JobRecord["type"], status?: JobRecord["status"]): JobRecord | null {
   return jobs
-    .filter((job) => (type ? job.type === type : ["issue_run", "qa_run", "architect_blocker_run", "architect_review_run", "merge_run"].includes(job.type)) && (!status || job.status === status) && job.payload.issueId === issueId)
+    .filter((job) => (type ? job.type === type : ["issue_run", "qa_run", "architect_blocker_run", "architect_review_run", "merge_run"].includes(job.type)) && (!status || job.status === status) && (status || job.status !== "cancelled") && job.payload.issueId === issueId)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] ?? null;
 }
 

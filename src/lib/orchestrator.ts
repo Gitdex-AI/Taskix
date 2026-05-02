@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { CodexClient } from "@/lib/codex";
+import { developerRoleIds, type DeveloperRoleId } from "@/lib/developer-roles";
 import { GitHubClient } from "@/lib/github";
 import { addLabelsWithGh, commentIssueWithGh, commentPullRequestWithGh, createIssueWithGh, createPullRequestWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh, removeLabelsWithGh, updateIssueWithGh } from "@/lib/github-local";
 import { findDependencyIssue, isDependencySatisfied, normalizeIssueDependenciesToNumbers } from "@/lib/issue-dependencies";
@@ -275,6 +276,7 @@ export async function syncWorkflowFromGitHub(workflowId: string, project?: Proje
     issue.prUrl = primaryPr?.url ?? null;
     issue.prState = primaryPr?.state ?? null;
     issue.prLabels = primaryPr?.labels ?? [];
+    issue.developerRole = roleFromLabels([...snapshot.labels, ...(primaryPr?.labels ?? [])]) ?? issue.developerRole;
     const now = new Date().toISOString();
     if (workflow.projectId && issue.developerSessionId) {
       await appendAgentMessages({
@@ -342,6 +344,12 @@ export async function syncWorkflowFromGitHub(workflowId: string, project?: Proje
 
   await saveWorkflow(workflow);
   return workflow;
+}
+
+function roleFromLabels(labels: string[]): DeveloperRoleId | null {
+  const roleLabel = labels.map((label) => label.toLowerCase()).find((label) => label.startsWith("role:"));
+  const role = roleLabel?.slice("role:".length) ?? "";
+  return developerRoleIds.includes(role as DeveloperRoleId) ? role as DeveloperRoleId : null;
 }
 
 async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: CodexClient, createIssue: (issue: IssueSpec) => Promise<{ number: number | null; htmlUrl: string | null; mock: boolean }>, project?: ProjectRecord | null): Promise<{
