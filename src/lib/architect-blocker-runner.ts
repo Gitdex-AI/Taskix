@@ -125,6 +125,10 @@ export async function runArchitectBlockerResolution(project: ProjectRecord, sess
     sessionId: result.sessionId ?? project.architectSessionId ?? existingArchitectSession?.sessionId ?? null,
     workflowId: session.workflowId ?? null,
     issueId: session.issueId ?? null,
+    githubIssueNumber: session.githubIssueNumber ?? issue?.githubIssueNumber ?? null,
+    githubIssueUrl: session.githubIssueUrl ?? (issue?.githubIssueNumber ? `https://github.com/${project.githubRepo}/issues/${issue.githubIssueNumber}` : null),
+    prUrl: session.prUrl ?? issue?.prUrl ?? null,
+    labels: issue?.labels ?? session.labels,
     currentStep: result.resolution.action === "retry_developer" ? "blocker resolved" : "blocker reviewed",
     finishedAt,
     durationMs,
@@ -135,10 +139,6 @@ export async function runArchitectBlockerResolution(project: ProjectRecord, sess
     ]
   });
 
-  session.messages = [
-    ...session.messages,
-    { role: "assistant", content: `Architect resolution:\n${resolutionText}`, createdAt: finishedAt }
-  ];
   session.executionLogs = [...(session.executionLogs ?? []), ...executionLogs];
   session.finishedAt = finishedAt;
   session.durationMs = durationMs;
