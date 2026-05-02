@@ -13,7 +13,7 @@ import { ProjectReturnToDeveloperButton } from "@/components/ProjectReturnToDeve
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
-import { findReadyForArchitectPayload } from "@/lib/pm-handoff";
+import { findReadyForArchitectPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
 import { getIssueQaStatus } from "@/lib/qa-status";
 import { getAgentSession, getProject, listAgentSessions, listJobs, listProjectWorkflows } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord, WorkflowRecord } from "@/lib/types";
@@ -61,7 +61,10 @@ export default async function ProjectDetailPage({
   const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
   const latestWorkflow = queuedWorkflow ?? visibleActiveWorkflows[0] ?? sortedWorkflows[0] ?? null;
-  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !queuedWorkflow && !isInspectingIssueSession);
+  const hasMatchingPmHandoffWorkflow = readyForArchitectPayload
+    ? sortedWorkflows.some((workflow) => workflow.userRequirement === formatPmHandoffPayload(readyForArchitectPayload))
+    : false;
+  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
   const workflowPanelWorkflows = hasUnqueuedPmHandoff ? [] : latestWorkflow ? [latestWorkflow] : [];
   const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
   const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
