@@ -322,7 +322,7 @@ function ThreePhaseWorkflowPanel(input: {
           />
         </Group>
         <Stack gap="xs" mt="sm">
-          {renderGithubIssueRows(input.projectId, input.workflows, input.sessions, input.jobs, input.queuedJobId)}
+          {renderGithubIssueRows(input.projectId, input.workflows, input.sessions, input.jobs, input.queuedJobId, input.autoRunState)}
         </Stack>
         <Group justify="flex-end" gap="xs" mt="xs">
           <Button component="a" href={`/projects/${input.projectId}/github-triage`} variant="subtle" size="compact-xs" radius="xl">
@@ -682,7 +682,7 @@ function renderDeveloperIssueRows(projectId: string, workflows: WorkflowRecord[]
   });
 }
 
-function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[], jobs: JobRecord[], queuedJobId: string | null): ReactNode {
+function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[], jobs: JobRecord[], queuedJobId: string | null, autoRunState: AutoRunState | null): ReactNode {
   const rows = workflows
     .flatMap((workflow) => workflow.issues.map((issue) => ({ workflow, issue })))
     .filter(({ issue }) => issue.githubState !== "CLOSED" && issue.prState !== "MERGED");
@@ -743,7 +743,8 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
               canArchitectReview,
               canMerge,
               canRunDev,
-              specBlockedSessionKey
+              specBlockedSessionKey,
+              autoRunState
             })}
           </Group>
         </Group>
@@ -763,18 +764,21 @@ function renderIssueStageAction(input: {
   canMerge: boolean;
   canRunDev: boolean;
   specBlockedSessionKey: string | null;
+  autoRunState: AutoRunState | null;
 }): ReactNode {
-  if (input.activeJob?.status === "pending") return wrapAutoRunAction(runningLabelForJob(input.activeJob), <ProjectRunJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />);
-  if (input.activeJob?.status === "running") return <RunningActionButton label={runningLabelForJob(input.activeJob)} />;
-  if (input.activeJob?.status === "failed" && shouldFailedJobReturnToDeveloper(input.activeJob)) return wrapAutoRunAction("Dev running", <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  const autoRunActive = isAutoRunRunningForIssue(input.autoRunState, input.issue);
+  if (input.activeJob?.status === "pending" && autoRunActive) return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
+  if (input.activeJob?.status === "pending") return wrapAutoRunAction(runningLabelForJob(input.activeJob, input.issue), <ProjectRunJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />);
+  if (input.activeJob?.status === "running") return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
+  if (input.activeJob?.status === "failed" && shouldFailedJobReturnToDeveloper(input.activeJob)) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (input.activeJob?.status === "failed") return <ProjectRetryJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />;
-  if (input.qaStatusId === "spec_blocked" && input.specBlockedSessionKey) return wrapAutoRunAction("Architect running", <ProjectEscalateSessionButton projectId={input.projectId} sessionKey={input.specBlockedSessionKey} />);
-  if (input.qaStatusId === "failed") return wrapAutoRunAction("Dev running", <ProjectReturnToDeveloperButton projectId={input.projectId} issueId={input.issue.issueId} />);
-  if (input.canMerge) return wrapAutoRunAction("Merge running", <ProjectMergePrButton projectId={input.projectId} issueId={input.issue.issueId} prUrl={input.issue.prUrl} />);
-  if (input.canArchitectReview) return wrapAutoRunAction("Review running", <ProjectArchitectReviewButton projectId={input.projectId} issueId={input.issue.issueId} />);
-  if (input.canHandoffToQa || (input.issue.prUrl && input.qaStatusId === "needed")) return wrapAutoRunAction("QA running", <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} />);
-  if (input.canRunDev) return wrapAutoRunAction("Dev running", <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
-  if (!input.issue.prUrl && input.completedDeveloperJob) return wrapAutoRunAction("Dev running", <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (input.qaStatusId === "spec_blocked" && input.specBlockedSessionKey) return wrapAutoRunAction(runningLabelForStage("Architect", input.issue), <ProjectEscalateSessionButton projectId={input.projectId} sessionKey={input.specBlockedSessionKey} />);
+  if (input.qaStatusId === "failed") return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectReturnToDeveloperButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (input.canMerge) return wrapAutoRunAction(runningLabelForStage("Merge", input.issue), <ProjectMergePrButton projectId={input.projectId} issueId={input.issue.issueId} prUrl={input.issue.prUrl} />);
+  if (input.canArchitectReview) return wrapAutoRunAction(runningLabelForStage("Review", input.issue), <ProjectArchitectReviewButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (input.canHandoffToQa || (input.issue.prUrl && input.qaStatusId === "needed")) return wrapAutoRunAction(runningLabelForStage("QA", input.issue), <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (input.canRunDev) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (!input.issue.prUrl && input.completedDeveloperJob) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
   return null;
 }
 
@@ -807,17 +811,26 @@ function runLabelForJob(job: JobRecord): string {
   return "Run Dev";
 }
 
-function runningLabelForJob(job: JobRecord): string {
-  if (job.type === "qa_run") return "QA running";
-  if (job.type === "architect_blocker_run") return "Architect running";
-  if (job.type === "architect_review_run") return "Review running";
-  if (job.type === "merge_run") return "Merge running";
-  return "Dev running";
+function runningLabelForJob(job: JobRecord, issue: IssueRecord): string {
+  if (job.type === "qa_run") return runningLabelForStage("QA", issue);
+  if (job.type === "architect_blocker_run") return runningLabelForStage("Architect", issue);
+  if (job.type === "architect_review_run") return runningLabelForStage("Review", issue);
+  if (job.type === "merge_run") return runningLabelForStage("Merge", issue);
+  return runningLabelForStage("Dev", issue);
+}
+
+function runningLabelForStage(stage: string, issue: IssueRecord): string {
+  void issue;
+  return `${stage} running`;
+}
+
+function isAutoRunRunningForIssue(state: AutoRunState | null, issue: IssueRecord): boolean {
+  return Boolean(state && ["running", "pause_requested", "cancel_requested"].includes(state.status) && state.issueIds.includes(issue.issueId));
 }
 
 function RunningActionButton({ label }: { label: string }): ReactNode {
   return (
-    <Button type="button" variant="light" size="compact-xs" radius="xl" loading disabled>
+    <Button type="button" variant="light" size="compact-xs" radius="xl" loading disabled title={label}>
       {label}
     </Button>
   );
