@@ -234,8 +234,10 @@ Rules:
 - Set developerRole to exactly one id from the available catalog. Do not invent new role ids.
 - Use general_developer only when no specific catalog role fits.
 - Set ownedPaths to the repository directories/files this developer owns, for example ["src/app", "src/components"].
+- Include directly related automated test files in ownedPaths when acceptance criteria change behavior that existing tests verify, for example ["scripts/header-label.test.mjs"] for a header label change.
 - Keep ownedPaths as non-overlapping as possible across issues to reduce code conflicts.
 - Each issue should have clear directory ownership and should not require edits outside ownedPaths unless explicitly stated in acceptance criteria.
+- Acceptance criteria should make expected test updates explicit when a requirement intentionally changes text, behavior, parsing, routing, labels, or workflow state already covered by tests.
 - Mark independent issues with the same parallelGroup when they can run at the same time.
 - Set dependsOn to the titles of issues that must complete first. Use [] for issues that can start immediately.
 - Set executionOrder to the intended serial order, using the same number for issues that can run in parallel.`;
@@ -326,6 +328,7 @@ Hard rules:
 - The current working directory is the isolated clone for this issue: ${workspaceDir}.
 - Run git fetch, checkout, commit, and push only in the current working directory.
 - Work only inside ownedPaths from the GitHub issue unless an issue comment explicitly revises scope.
+- You may also update test files that directly verify this issue's acceptance criteria, even if the architect omitted them from ownedPaths. Keep those test edits minimal and explain the test-scope reason in summary.
 - If Current active PR is not "none", update that PR branch and return the same PR URL. Do not create a replacement PR unless the existing PR is closed or unusable.
 - If Returned from QA is "yes", address QA findings on the current active PR branch and push follow-up commits.
 - If there is no active PR, create a branch named taskix/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.

@@ -32,6 +32,8 @@ All development work should start from a GitHub issue. Create a feature branch f
 
 Developers implement the requested change, add repeatable test cases where feasible, run baseline checks, and create or update the GitHub issue with QA instructions. Treat QA as an independent validator, not as a code co-author. The QA issue should include the requirement, changed files, acceptance criteria, automated test commands, expected test cases, and any targeted browser scenarios to verify.
 
+Architect issue breakdown must include directly related test files in `ownedPaths` when the acceptance criteria affect existing automated checks. Developers may update tests that directly verify the issue acceptance criteria, even when those files live outside the primary implementation directory, and must mention that test-scope reason in the PR summary. This exception does not allow broad refactors or unrelated test churn.
+
 QA should validate the submitted test cases first, then perform focused web UI checks for the user-visible path. Manual clicking is not a substitute for repeatable tests; it is used to confirm that the tested behavior is wired correctly in the browser. For workflow UI changes, QA should run `npm run dev`, visit the affected project page, trigger the relevant controls, and confirm the visible next action matches the issue acceptance criteria.
 
 QA should test from user-visible behavior and leave a GitHub issue comment with:
@@ -90,8 +92,8 @@ Planning-only safe main-flow smoke recheck for Issue 15:
 - Job handling: any `issue_run` jobs are only queued for later manual Run Jobs execution and are not executed as part of this work
 
 - PM keeps talking with the user and hands confirmed requirements to the architect.
-- Architect creates issues with developerRole and ownedPaths.
-- Developers must stay inside ownedPaths.
+- Architect creates issues with developerRole and ownedPaths, including directly related test files when acceptance criteria depend on automated checks.
+- Developers must stay inside ownedPaths, except for narrowly scoped updates to tests that directly verify the issue acceptance criteria.
 - QA must validate every developer PR before merge.
 - Architect may merge only after QA passes.
 - DevOps owns deployment setup, GitHub Actions/CD workflow, deployment secrets guidance, release automation, and rollback planning.
