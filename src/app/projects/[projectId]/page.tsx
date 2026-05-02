@@ -777,6 +777,7 @@ function renderIssueStageAction(input: {
   if (input.canArchitectReview) return wrapAutoRunAction(runningLabelForStage("Review", input.issue), <ProjectArchitectReviewButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (input.canHandoffToQa || (input.issue.prUrl && input.qaStatusId === "needed")) return wrapAutoRunAction(runningLabelForStage("QA", input.issue), <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (input.canRunDev) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (isDeveloperBlockedIssue(input.issue)) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (hasAnyLabel(input.issue, ["taskix:blocked", "taskix:spec-blocked"])) return null;
   if (!input.issue.prUrl && input.completedDeveloperJob) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
   return null;
@@ -788,6 +789,10 @@ function wrapAutoRunAction(runningLabel: string, action: ReactNode): ReactNode {
 
 function shouldFailedJobReturnToDeveloper(job: JobRecord): boolean {
   return job.type === "architect_review_run" || job.type === "merge_run";
+}
+
+function isDeveloperBlockedIssue(issue: IssueRecord): boolean {
+  return hasAnyLabel(issue, ["taskix:blocked"]) && !hasAnyLabel(issue, ["taskix:spec-blocked"]) && issue.prState !== "MERGED";
 }
 
 function canRunDeveloperIssue(issue: IssueRecord, issues: IssueRecord[]): boolean {
