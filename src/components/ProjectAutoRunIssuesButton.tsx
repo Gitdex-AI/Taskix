@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Group, Text } from "@mantine/core";
+import { ActionIcon, Button, Group, Text } from "@mantine/core";
 import { Pause, Play, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -133,14 +133,14 @@ export function ProjectAutoRunIssuesButton({
           {runningLabel ?? (paused ? "Resume" : "Auto Run")}
         </Button>
         {autoRunActive && state?.status !== "pause_requested" && state?.status !== "cancel_requested" ? (
-          <Button type="button" variant="light" size="compact-xs" radius="xl" leftSection={<Pause size={14} />} onClick={() => control("pause")}>
-            Pause
-          </Button>
+          <ActionIcon type="button" variant="light" size="sm" radius="xl" aria-label="Pause Auto Run" title="Pause Auto Run" onClick={() => control("pause")}>
+            <Pause size={14} />
+          </ActionIcon>
         ) : null}
         {(autoRunActive || paused) ? (
-          <Button type="button" color="red" variant="light" size="compact-xs" radius="xl" leftSection={<Square size={14} />} onClick={() => control("cancel")}>
-            Stop
-          </Button>
+          <ActionIcon type="button" color="red" variant="light" size="sm" radius="xl" aria-label="Stop Auto Run" title="Stop Auto Run" onClick={() => control("cancel")}>
+            <Square size={14} />
+          </ActionIcon>
         ) : null}
       </Group>
       {error ? <Text size="xs" c="red" maw={220}>{error}</Text> : null}
