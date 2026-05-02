@@ -395,7 +395,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     activeBranch: issue.branch ?? null,
     returnedFromQa: includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:qa-failed", "qa-failed", "taskix:blocked", "taskix:dev-running"])
   });
-  if (!developerResult.prUrl) {
+  if (!developerResult.prUrl && developerResult.blockedType !== "spec") {
     const recovery = await recoverDeveloperPullRequest(project.githubRepo, issue, workflow, developerResult.branch);
     if (recovery) {
       developerResult.prUrl = recovery.prUrl;
@@ -404,7 +404,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       timeline.push(`Recovered existing PR context for issue ${issue.issueId} via ${recovery.source}; base ${recovery.base ?? "repository default branch"}.`);
     }
   }
-  if (!developerResult.prUrl && developerResult.branch) {
+  if (!developerResult.prUrl && developerResult.branch && developerResult.blockedType !== "spec") {
     try {
       developerResult.prUrl = await createDeveloperPullRequest(project.githubRepo, issue, workflow, developerResult);
       timeline.push(`Taskix created PR ${developerResult.prUrl} for issue ${issue.issueId} from branch ${developerResult.branch}.`);
@@ -435,6 +435,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
   if (workflow.projectId) {
     const finishedAt = new Date().toISOString();
     const closeAt = developerResult.prUrl ? finishedAt : null;
+    const blockedLabels = developerResult.blockedType === "spec" ? ["taskix:spec-blocked", "taskix:blocked"] : ["taskix:blocked"];
     await appendAgentMessages({
       sessionKey: issue.developerSessionId ?? `${issue.issueId}:developer`,
       projectId: workflow.projectId,
@@ -452,7 +453,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       githubIssueNumber: issue.githubIssueNumber,
       githubIssueUrl: issue.githubIssueUrl ?? null,
       prUrl: developerResult.prUrl || null,
-      labels: developerResult.prUrl ? ["taskix:pr-opened"] : ["taskix:blocked"],
+      labels: developerResult.prUrl ? ["taskix:pr-opened"] : blockedLabels,
       closedAt: closeAt,
       archivedAt: closeAt,
       executionLogs: developerResult.executionLog ? [{
@@ -463,13 +464,30 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
         durationMs: Math.max(0, new Date(finishedAt).getTime() - new Date(developerStartedAt).getTime())
       }] : [],
       messages: [
-        { role: "assistant", content: `Summary: ${developerResult.summary}\nBranch: ${developerResult.branch || "none"}\nPR: ${developerResult.prUrl || "none"}\nTests: ${developerResult.testsRun.join(", ") || "none"}`, createdAt: new Date().toISOString() }
+        { role: "assistant", content: `Summary: ${developerResult.summary}\nBlocked type: ${developerResult.blockedType}\nBranch: ${developerResult.branch || "none"}\nPR: ${developerResult.prUrl || "none"}\nTests: ${developerResult.testsRun.join(", ") || "none"}`, createdAt: new Date().toISOString() }
       ]
     });
   }
   timeline.push(developerResult.prUrl ? `Developer opened PR ${developerResult.prUrl} for issue ${issue.issueId}.` : `Developer did not return a PR for issue ${issue.issueId}.`);
 
   if (!developerResult.prUrl) {
+    if (developerResult.blockedType === "spec") {
+      issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !["taskix:dev-running", "taskix:qa-failed", "qa-failed"].includes(label.toLowerCase())), "taskix:spec-blocked", "taskix:blocked"])];
+      issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !["taskix:dev-running", "taskix:qa-failed", "qa-failed"].includes(label.toLowerCase())), "taskix:spec-blocked", "taskix:blocked"])];
+      if (issue.githubIssueNumber) {
+        await removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, ["taskix:dev-running", "taskix:qa-failed", "qa-failed"]);
+        await addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, ["taskix:spec-blocked", "taskix:blocked"]);
+        await commentIssueWithGh(project.githubRepo, issue.githubIssueNumber, [
+          "Developer blocked on issue specification.",
+          "",
+          "This issue needs architect clarification before development can continue.",
+          "",
+          "## Summary",
+          developerResult.summary
+        ].join("\n"));
+      }
+      timeline.push(`Developer marked ${issue.issueId} spec-blocked for architect clarification.`);
+    }
     return {
       timeline,
       releaseNote: {
@@ -479,7 +497,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
         ownedPaths,
         developerSummary: developerResult.summary,
         blocked: true,
-        reason: "Developer did not return PR URL"
+        reason: developerResult.blockedType === "spec" ? "Developer requested architect clarification" : "Developer did not return PR URL"
       },
       blocked: true
     };

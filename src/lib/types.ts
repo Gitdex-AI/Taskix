@@ -72,6 +72,7 @@ export type DeveloperResult = {
 
 export type DeveloperIssueResult = {
   summary: string;
+  blockedType: "none" | "implementation" | "spec" | "environment";
   branch: string;
   prUrl: string;
   changedFiles: string[];

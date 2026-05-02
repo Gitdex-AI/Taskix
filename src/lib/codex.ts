@@ -298,6 +298,7 @@ Implementation must stay within owned paths unless the issue explicitly calls ou
   }): Promise<DeveloperIssueResult> {
     const schema = objectSchema({
       summary: { type: "string" },
+      blockedType: { type: "string", enum: ["none", "implementation", "spec", "environment"] },
       branch: { type: "string" },
       prUrl: { type: "string" },
       changedFiles: { type: "array", items: { type: "string" } },
@@ -309,6 +310,7 @@ Implementation must stay within owned paths unless the issue explicitly calls ou
     } catch (error) {
       return {
         summary: `Developer workspace preparation failed for issue #${input.issueNumber}: ${error instanceof Error ? error.message : String(error)}`,
+        blockedType: "environment",
         branch: "",
         prUrl: "",
         changedFiles: [],
@@ -344,11 +346,18 @@ Hard rules:
 - Implement the issue, run relevant tests, commit, and push the branch. Do not run gh pr create.
 - Do not add/remove GitHub labels or comments. Taskix server will create/update the PR and labels after you return JSON.
 - If implementation is blocked, return JSON with prUrl as an empty string and explain the blocker in summary.
+- Set blockedType:
+  - "none" when a PR was created or updated.
+  - "implementation" when you are blocked by a normal implementation or tooling problem that developer can resolve on retry.
+  - "spec" when the GitHub issue is unclear, contradictory, missing required architecture decisions, has unsafe acceptance criteria, has insufficient ownedPaths, or cannot be executed without architect clarification. Do not choose the technical policy yourself in this case.
+  - "environment" when local workspace/tooling prevents work from starting or completing.
+- For blockedType "spec", do not create a PR. Explain the exact issue or architecture clarification needed so Architect can update the GitHub issue.
 
-Return JSON with summary, branch, prUrl, changedFiles, testsRun.`;
+Return JSON with summary, blockedType, branch, prUrl, changedFiles, testsRun.`;
     const result = await this.runJsonResult<DeveloperIssueResult>(prompt, schema, { cwd: workspaceDir });
     return result.value ? { ...result.value, executionLog: result.executionLog } : {
       summary: `Developer runner did not complete issue #${input.issueNumber}.${result.error ? `\n\nCodex error:\n${result.error}` : ""}`,
+      blockedType: "environment",
       branch: "",
       prUrl: "",
       changedFiles: [],

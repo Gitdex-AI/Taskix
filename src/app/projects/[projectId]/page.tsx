@@ -707,12 +707,15 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
     .filter(({ issue }) => issue.githubState !== "CLOSED" && issue.prState !== "MERGED");
   if (!rows.length) return <Text size="xs" c="dimmed">No unfinished GitHub issues are being tracked.</Text>;
   return rows.map(({ workflow, issue }) => {
+    const developerSession = sessions.find((session) => session.sessionKey === issue.developerSessionId);
     const qaSession = sessions.find((session) => session.sessionKey === issue.qaSessionId);
     const qaStatus = getIssueQaStatus(issue, qaSession);
     const reviewed = hasAnyLabel(issue, ["taskix:ready-to-merge"]);
     const qaPassed = hasAnyLabel(issue, ["qa-passed", "taskix:qa-passed"]);
     const canHandoffToQa = Boolean(issue.prUrl) && qaStatus.id === "not_requested";
-    const specBlockedSessionKey = qaStatus.id === "spec_blocked" && qaSession?.status === "blocked" ? qaSession.sessionKey : null;
+    const specBlockedSessionKey = qaStatus.id === "spec_blocked"
+      ? (developerSession?.status === "blocked" ? developerSession.sessionKey : qaSession?.status === "blocked" ? qaSession.sessionKey : null)
+      : null;
     const canArchitectReview = Boolean(issue.prUrl) && qaPassed && !reviewed && issue.prState !== "MERGED";
     const canMerge = Boolean(issue.prUrl) && reviewed && issue.prState !== "MERGED";
     const activeJob = latestIssueJob(issue.issueId, jobs);
