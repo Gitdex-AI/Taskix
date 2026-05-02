@@ -403,7 +403,6 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       githubIssueUrl: issue.githubIssueUrl ?? null,
       labels: ["taskix:dev-running"],
       messages: [
-        { role: "system", content: `Owned paths: ${ownedPaths}`, createdAt: developerStartedAt },
         { role: "user", content: `Handle GitHub issue #${issue.githubIssueNumber}: ${issue.title}`, createdAt: developerStartedAt }
       ]
     });
