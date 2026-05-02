@@ -15,6 +15,7 @@ import {
   runSelfUpdate,
   selfUpdateGuard,
   setSelfUpdateCommandRunnerForTests,
+  setSelfUpdateOperatorIntentClockForTests,
   validateSelfUpdateOperatorIntent
 } from "../src/lib/self-update.ts";
 
@@ -167,8 +168,29 @@ test("operator intent validation rejects missing stale and invalid tokens", () =
   );
   assert.equal(
     validateSelfUpdateOperatorIntent({ nonce: firstIntent.cookie.value, token: firstIntent.token }).ok,
+    false
+  );
+  assert.equal(
+    validateSelfUpdateOperatorIntent({ nonce: secondIntent.cookie.value, token: secondIntent.token }).ok,
     true
   );
+  assert.equal(
+    validateSelfUpdateOperatorIntent({ nonce: secondIntent.cookie.value, token: secondIntent.token }).ok,
+    false
+  );
+});
+
+test("operator intent validation rejects expired tokens", () => {
+  process.env.TASKIX_ENABLE_SELF_UPDATE = "true";
+  let now = 1_000;
+  setSelfUpdateOperatorIntentClockForTests(() => now);
+
+  const intent = mintSelfUpdateOperatorIntent();
+  assert.ok(intent);
+
+  now += intent.cookie.maxAge * 1000 + 1;
+
+  assert.equal(validateSelfUpdateOperatorIntent({ nonce: intent.cookie.value, token: intent.token }).ok, false);
 });
 
 test("operator self-update flow requires a valid server-minted intent token", async () => {
@@ -197,6 +219,13 @@ test("operator self-update flow requires a valid server-minted intent token", as
   );
 
   assert.equal(accepted.status, 200);
+  assert.deepEqual(calls, ["git pull", "npm install", "npm run build"]);
+
+  const replay = await runOperatorSelfUpdate(
+    { nonce: intent.cookie.value, token: intent.token },
+    "/tmp/taskix-self-update-operator-test"
+  );
+  assert.equal(replay.status, 403);
   assert.deepEqual(calls, ["git pull", "npm install", "npm run build"]);
 });
 

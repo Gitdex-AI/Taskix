@@ -64,10 +64,13 @@ let lastRun: SelfUpdateRunResult | null = null;
 let commandRunner: CommandRunner = runCommand;
 let restartStatus: SelfUpdateState["restartStatus"] = "idle";
 let restartError: string | null = null;
+let activeOperatorIntent: { nonce: string; expiresAt: number } | null = null;
+let operatorIntentNow = () => Date.now();
 
 const bootId = randomUUID();
 const startedAt = new Date().toISOString();
 const operatorIntentSecret = randomBytes(32).toString("hex");
+const operatorIntentMaxAgeSeconds = 5 * 60;
 
 export function isSelfUpdateEnabled(env: NodeJS.ProcessEnv = process.env) {
   return env.TASKIX_ENABLE_SELF_UPDATE === "true";
@@ -214,16 +217,22 @@ export function consumeRestartAvailability() {
 
 export function mintSelfUpdateOperatorIntent() {
   if (!isSelfUpdateEnabled()) {
+    activeOperatorIntent = null;
     return null;
   }
 
   const nonce = randomBytes(32).toString("base64url");
+  activeOperatorIntent = {
+    nonce,
+    expiresAt: operatorIntentNow() + operatorIntentMaxAgeSeconds * 1000
+  };
+
   return {
     token: signOperatorIntentNonce(nonce),
     cookie: {
       name: selfUpdateOperatorNonceCookieName,
       value: nonce,
-      maxAge: 5 * 60
+      maxAge: operatorIntentMaxAgeSeconds
     }
   };
 }
@@ -245,6 +254,31 @@ export function validateSelfUpdateOperatorIntent(input: { nonce?: string | null;
     };
   }
 
+  if (!activeOperatorIntent) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Self-update operator intent token is invalid or expired."
+    };
+  }
+
+  if (operatorIntentNow() > activeOperatorIntent.expiresAt) {
+    activeOperatorIntent = null;
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Self-update operator intent token is invalid or expired."
+    };
+  }
+
+  if (input.nonce !== activeOperatorIntent.nonce) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Self-update operator intent token is invalid or expired."
+    };
+  }
+
   if (!constantTimeEqual(input.token, signOperatorIntentNonce(input.nonce))) {
     return {
       ok: false as const,
@@ -253,6 +287,7 @@ export function validateSelfUpdateOperatorIntent(input: { nonce?: string | null;
     };
   }
 
+  activeOperatorIntent = null;
   return { ok: true as const };
 }
 
@@ -270,12 +305,18 @@ export function setSelfUpdateCommandRunnerForTests(runner: CommandRunner) {
   commandRunner = runner;
 }
 
+export function setSelfUpdateOperatorIntentClockForTests(now: () => number) {
+  operatorIntentNow = now;
+}
+
 export function resetSelfUpdateStateForTests() {
   restartAvailable = false;
   lastRun = null;
   commandRunner = runCommand;
   restartStatus = "idle";
   restartError = null;
+  activeOperatorIntent = null;
+  operatorIntentNow = () => Date.now();
 }
 
 async function runCommand(command: SelfUpdateCommand, cwd: string): Promise<SelfUpdateCommandResult> {
