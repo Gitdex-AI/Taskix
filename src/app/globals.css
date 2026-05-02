@@ -577,13 +577,16 @@ pre,
 .phase-stat.active {
   background: #eff6ff;
   border-color: #93c5fd;
+  box-shadow: 0 1px 0 #bfdbfe;
 }
 
 .phase-panel {
+  margin-top: 8px;
   padding: 12px;
-  background: #ffffff;
-  border: 1px solid #e0e7f0;
+  background: #fbfdff;
+  border: 1px solid #93c5fd;
   border-radius: 8px;
+  box-shadow: inset 0 2px 0 #bfdbfe;
 }
 
 .github-issue-row {

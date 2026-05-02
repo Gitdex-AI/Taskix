@@ -279,13 +279,8 @@ function ThreePhaseWorkflowPanel(input: {
   if (input.selectedPhase === "requirements") {
     return (
       <section className="phase-panel">
-        <Group justify="space-between" align="flex-start" gap="sm">
-          <div>
-            <Text size="sm" fw={820}>1. Requirements</Text>
-            <Text size="xs" c="dimmed">PM confirms scope, then architect creates GitHub issues.</Text>
-          </div>
-        </Group>
-        <Stack gap="xs" mt="sm">
+        <Stack gap="xs">
+          <Text size="xs" c="dimmed">PM confirms scope, then architect creates GitHub issues.</Text>
           {!input.isInspectingIssueSession && input.readyForArchitectPayload ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} /> : null}
           {renderRequirementRows(input.projectId, input.requirementWorkflows, input.jobs)}
         </Stack>
@@ -297,10 +292,7 @@ function ThreePhaseWorkflowPanel(input: {
     return (
       <section className="phase-panel">
         <Group justify="space-between" align="flex-start" gap="sm">
-          <div>
-            <Text size="sm" fw={820}>2. GitHub Tracking</Text>
-            <Text size="xs" c="dimmed">GitHub issues drive development, QA, architect review, and merge.</Text>
-          </div>
+          <Text size="xs" c="dimmed">GitHub issues drive development, QA, architect review, and merge.</Text>
           <ProjectRunJobsForm projectId={input.projectId} label="Run Ready Jobs" />
         </Group>
         <Stack gap="xs" mt="sm">
@@ -314,10 +306,7 @@ function ThreePhaseWorkflowPanel(input: {
   return (
       <section className="phase-panel">
         <Group justify="space-between" align="flex-start" gap="sm">
-          <div>
-            <Text size="sm" fw={820}>3. Operations</Text>
-            <Text size="xs" c="dimmed">DevOps handles deployment, incidents, and follow-up issue intake.</Text>
-          </div>
+          <Text size="xs" c="dimmed">DevOps handles deployment, incidents, and follow-up issue intake.</Text>
           <Button component="a" href={`/projects/${input.projectId}?role=devops`} variant="light" size="compact-xs" radius="xl">
             Open DevOps
           </Button>
