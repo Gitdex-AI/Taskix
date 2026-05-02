@@ -1,5 +1,6 @@
 import { CodexClient } from "@/lib/codex";
 import { addLabelsWithGh, commentIssueWithGh, removeLabelsWithGh } from "@/lib/github-local";
+import { syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveProject, saveWorkflow } from "@/lib/store";
 import type { IssueRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
@@ -87,6 +88,7 @@ export async function runWorkflowMerge(workflowId: string, issueId: string, proj
   }
 
   await runArchitectMergeRequest(project, workflow, issue);
+  await syncWorkflowUntilMerged(project, workflow.workflowId, issue.issueId);
 }
 
 async function runArchitectMergeRequest(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord): Promise<void> {
@@ -156,4 +158,17 @@ function labelsToRemove(labels: string[]): string[] {
 function mergeLabels(existing: string[], removed: string[], applied: string[]): string[] {
   const removedSet = new Set(removed.map((label) => label.toLowerCase()));
   return [...new Set([...existing.filter((label) => !removedSet.has(label.toLowerCase())), ...applied])];
+}
+
+async function syncWorkflowUntilMerged(project: ProjectRecord, workflowId: string, issueId: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (attempt) await sleep(1000);
+    const workflow = await syncWorkflowFromGitHub(workflowId, project);
+    const issue = workflow.issues.find((item) => item.issueId === issueId);
+    if (issue?.githubState === "CLOSED" || issue?.prState === "MERGED") return;
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
