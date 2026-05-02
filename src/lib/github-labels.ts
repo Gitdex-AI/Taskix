@@ -1,9 +1,7 @@
 import { developerRoleCatalog, type DeveloperRoleId } from "@/lib/developer-roles";
 
 export const taskixLabels = [
-  { name: "taskix:planned", color: "bfdadc", description: "Taskix issue planned by architect" },
   { name: "taskix:dev-running", color: "1d76db", description: "Taskix developer is working" },
-  { name: "taskix:pr-opened", color: "5319e7", description: "Taskix developer opened a PR" },
   { name: "taskix:architect-review", color: "fbca04", description: "Taskix architect review required" },
   { name: "taskix:need-qa", color: "d93f0b", description: "Taskix QA validation required" },
   { name: "taskix:qa-running", color: "006b75", description: "Taskix QA is validating" },

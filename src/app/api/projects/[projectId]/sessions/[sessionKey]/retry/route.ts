@@ -17,7 +17,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
 
   session.status = "active";
   session.currentStep = "developer retry queued";
-  session.labels = [...new Set([...(session.labels ?? []).filter((label) => label !== "taskix:blocked"), "taskix:planned"])];
+  session.labels = [...new Set((session.labels ?? []).filter((label) => !["taskix:blocked", "taskix:planned"].includes(label.toLowerCase())))];
   session.updatedAt = new Date().toISOString();
   await saveAgentSession(session);
 

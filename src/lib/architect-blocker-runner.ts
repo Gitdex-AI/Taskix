@@ -67,15 +67,14 @@ export async function runArchitectBlockerResolution(project: ProjectRecord, sess
     issue.developerRole = developerRole;
     issue.ownedPaths = result.resolution.ownedPaths.length ? result.resolution.ownedPaths : issue.ownedPaths;
     issue.acceptanceCriteria = result.resolution.acceptanceCriteria.length ? result.resolution.acceptanceCriteria : issue.acceptanceCriteria;
-    issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !["taskix:blocked", "taskix:spec-blocked", "taskix:qa-failed", "qa-failed"].includes(label.toLowerCase())), "taskix:planned"])];
+    issue.labels = [...new Set((issue.labels ?? []).filter((label) => !["taskix:blocked", "taskix:spec-blocked", "taskix:qa-failed", "qa-failed", "taskix:planned"].includes(label.toLowerCase())))];
     workflow.status = "in_progress";
     workflow.timeline.push(`Architect resolved blocker for ${issue.issueId}; queued developer retry.`);
 
     if (issue.githubIssueNumber) {
       await updateIssueWithGh(project.githubRepo, issue.githubIssueNumber, issue);
       await commentIssueWithGh(project.githubRepo, issue.githubIssueNumber, result.resolution.comment || result.resolution.summary);
-      await removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, ["taskix:blocked", "taskix:spec-blocked", "taskix:qa-failed", "qa-failed"]);
-      await addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, ["taskix:planned"]);
+      await removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, ["taskix:blocked", "taskix:spec-blocked", "taskix:qa-failed", "qa-failed", "taskix:planned"]);
     }
 
     await saveWorkflow(workflow);

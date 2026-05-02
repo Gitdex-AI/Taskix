@@ -164,7 +164,7 @@ function findIssueForJob(workflows: WorkflowRecord[], job: JobRecord): IssueReco
 
 function canRunDeveloperIssue(issue: IssueRecord, issues: IssueRecord[]): boolean {
   if (isClosedIssue(issue) || issue.prUrl || issue.prState === "MERGED") return false;
-  if (hasAnyIssueLabel(issue, ["taskix:dev-running", "taskix:pr-opened", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"])) return false;
+  if (hasAnyIssueLabel(issue, ["taskix:dev-running", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"])) return false;
   const dependencies = issue.dependsOn ?? [];
   if (!dependencies.length) return true;
   return dependencies.every((dependency) => {

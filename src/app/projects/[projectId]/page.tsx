@@ -791,7 +791,7 @@ function shouldFailedJobReturnToDeveloper(job: JobRecord): boolean {
 function canRunDeveloperIssue(issue: IssueRecord, issues: IssueRecord[]): boolean {
   if (issue.prUrl || issue.prState === "MERGED" || issue.githubState === "CLOSED") return false;
   const labels = [...(issue.labels ?? []), ...(issue.prLabels ?? [])].map((label) => label.toLowerCase());
-  if (labels.some((label) => ["taskix:dev-running", "taskix:pr-opened", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"].includes(label))) return false;
+  if (labels.some((label) => ["taskix:dev-running", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"].includes(label))) return false;
   const dependencies = issue.dependsOn ?? [];
   if (!dependencies.length) return true;
   return dependencies.every((dependency) => {
@@ -845,9 +845,7 @@ function githubIssueStatusBadge(issue: IssueRecord, qaStatus: ReturnType<typeof 
   if (hasAnyLabel(issue, ["taskix:ready-to-merge"])) return { label: "Ready to merge", color: "green" };
   if (qaStatus.id !== "not_requested") return { label: qaStatus.label, color: qaStatus.color };
   if (hasAnyLabel(issue, ["taskix:architect-review"])) return { label: "Review needed", color: "yellow" };
-  if (hasAnyLabel(issue, ["taskix:pr-opened"])) return { label: "PR opened", color: "violet" };
   if (hasAnyLabel(issue, ["taskix:dev-running"])) return { label: "Dev running", color: "blue" };
-  if (hasAnyLabel(issue, ["taskix:planned"])) return { label: "Planned", color: "gray" };
   return { label: "Tracked", color: "gray" };
 }
 

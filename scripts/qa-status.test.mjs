@@ -11,7 +11,7 @@ const issue = (overrides = {}) => ({
 describe("getIssueQaStatus", () => {
   it("uses current issue and PR labels ahead of stale QA session state", () => {
     const status = getIssueQaStatus(
-      issue({ labels: ["taskix:pr-opened"], prLabels: ["taskix:architect-review"] }),
+      issue({ labels: ["role:web_developer"], prLabels: ["taskix:architect-review"] }),
       { role: "qa", status: "blocked", labels: ["taskix:qa-failed"] }
     );
 

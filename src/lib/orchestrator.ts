@@ -478,7 +478,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       githubIssueNumber: issue.githubIssueNumber,
       githubIssueUrl: issue.githubIssueUrl ?? null,
       prUrl: developerResult.prUrl || null,
-      labels: developerResult.prUrl ? ["taskix:pr-opened"] : blockedLabels,
+      labels: developerResult.prUrl ? ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : "role:general_developer"] : blockedLabels,
       closedAt: closeAt,
       archivedAt: closeAt,
       executionLogs: developerResult.executionLog ? [{
@@ -528,9 +528,10 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     };
   }
 
-  const developerCompletionCleanupLabels = ["taskix:dev-running", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:architect-review", "taskix:ready-to-merge", "taskix:blocked"];
-  issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), "taskix:pr-opened"])];
-  issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), "taskix:pr-opened"])];
+  const developerCompletionCleanupLabels = ["taskix:planned", "taskix:dev-running", "taskix:pr-opened", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:architect-review", "taskix:ready-to-merge", "taskix:blocked"];
+  const developerCompletionLabels = ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : "role:general_developer"];
+  issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), ...developerCompletionLabels])];
+  issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), ...developerCompletionLabels])];
   timeline.push(`Developer completed PR for issue ${issue.issueId}. Awaiting QA handoff.`);
   return {
     timeline,
@@ -592,7 +593,7 @@ async function queueReadyDeveloperJobs(projectId: string, workflow: WorkflowReco
 function isDeveloperIssueReady(issue: IssueRecord, issues: IssueRecord[]): boolean {
   const labels = [...(issue.labels ?? []), ...(issue.prLabels ?? [])].map((label) => label.toLowerCase());
   if (issue.prUrl || issue.prState === "MERGED") return false;
-  if (labels.some((label) => ["taskix:dev-running", "taskix:pr-opened", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"].includes(label))) return false;
+  if (labels.some((label) => ["taskix:dev-running", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"].includes(label))) return false;
   const dependencies = issue.dependsOn ?? [];
   if (!dependencies.length) return true;
   return dependencies.every((dependency) => {
@@ -634,7 +635,7 @@ async function createDeveloperPullRequest(repo: string, issue: IssueRecord, work
     base: expectedDeveloperBaseBranch(),
     title: issue.title,
     body,
-    labels: ["taskix:pr-opened", "taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter(Boolean)
+    labels: ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter(Boolean)
   });
   if (!isPullRequestUrl(prUrl)) throw new Error(`GitHub did not return a pull request URL for branch ${developerResult.branch}.`);
   return prUrl;
@@ -645,8 +646,8 @@ function isPullRequestUrl(value: string): boolean {
 }
 
 async function publishDeveloperPrStateToGitHub(repo: string, issue: IssueRecord, prUrl: string): Promise<void> {
-  const labelsToApply = ["taskix:pr-opened", "taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter((label): label is string => Boolean(label));
-  const labelsToClear = ["taskix:dev-running", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:ready-to-merge", "taskix:blocked"];
+  const labelsToApply = ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter((label): label is string => Boolean(label));
+  const labelsToClear = ["taskix:planned", "taskix:dev-running", "taskix:pr-opened", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:ready-to-merge", "taskix:blocked"];
   if (issue.githubIssueNumber) {
     await removeLabelsWithGh(repo, issue.githubIssueNumber, labelsToRemove(issue.labels ?? [], labelsToClear, labelsToApply));
     await addLabelsWithGh(repo, issue.githubIssueNumber, labelsToApply);
@@ -759,7 +760,7 @@ function deriveWorkflowStatus(workflow: WorkflowRecord): WorkflowRecord["status"
   if (hasBlocked) return "blocked";
   const allDone = issues.every((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:merged", "taskix:deployed"]) || issue.prState === "MERGED");
   if (allDone) return "done";
-  const anyProgress = issues.some((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:dev-running", "taskix:pr-opened", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"]));
+  const anyProgress = issues.some((issue) => Boolean(issue.prUrl) || issue.prState === "OPEN" || includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:dev-running", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"]));
   return anyProgress ? "in_progress" : workflow.status;
 }
 
