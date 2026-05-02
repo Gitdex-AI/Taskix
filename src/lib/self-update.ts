@@ -27,6 +27,8 @@ export type SelfUpdateState = {
   enabled: boolean;
   restartAvailable: boolean;
   lastRun: SelfUpdateRunResult | null;
+  trustedCallerAddressAvailable: boolean;
+  trustedLocalhostCallerValidated: boolean;
 };
 
 type CommandRunner = (command: SelfUpdateCommand, cwd: string) => Promise<SelfUpdateCommandResult>;
@@ -37,6 +39,7 @@ type RequestSource =
       nextUrl?: {
         hostname?: string | null;
       } | null;
+      url?: string | null;
       ip?: string | null;
       remoteAddress?: string | null;
     };
@@ -62,7 +65,6 @@ export function isLocalhostAddress(value: string | null | undefined) {
 
   const address = value.trim().toLowerCase();
   return (
-    address === "localhost" ||
     address === "127.0.0.1" ||
     address === "::1" ||
     address === "[::1]" ||
@@ -72,14 +74,20 @@ export function isLocalhostAddress(value: string | null | undefined) {
 }
 
 export function isLocalhostRequest(source: RequestSource) {
-  return isLocalhostAddress(getRuntimeRemoteAddress(source));
+  return isLocalhostAddress(getTrustedCallerAddress(source));
 }
 
-export function getSelfUpdateState(): SelfUpdateState {
+export function hasTrustedCallerAddress(source: RequestSource) {
+  return getTrustedCallerAddress(source) !== null;
+}
+
+export function getSelfUpdateState(source?: RequestSource): SelfUpdateState {
   return {
     enabled: isSelfUpdateEnabled(),
     restartAvailable,
-    lastRun
+    lastRun,
+    trustedCallerAddressAvailable: source ? hasTrustedCallerAddress(source) : false,
+    trustedLocalhostCallerValidated: source ? isLocalhostRequest(source) : false
   };
 }
 
@@ -103,18 +111,13 @@ export function selfUpdateGuard(source: RequestSource) {
   return { ok: true as const };
 }
 
-function getRuntimeRemoteAddress(source: RequestSource) {
+function getTrustedCallerAddress(source: RequestSource) {
   if (source instanceof Headers) {
     // Host and forwarding headers are caller-controlled in this route context, so header-only checks fail closed.
     return null;
   }
 
-  const runtimeAddress = source.ip || source.remoteAddress;
-  if (runtimeAddress) {
-    return runtimeAddress;
-  }
-
-  return source.nextUrl?.hostname || null;
+  return source.ip || source.remoteAddress || null;
 }
 
 export async function runSelfUpdate(cwd = process.cwd()): Promise<SelfUpdateRunResult> {

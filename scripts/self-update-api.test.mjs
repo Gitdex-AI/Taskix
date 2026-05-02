@@ -8,6 +8,7 @@ import {
   getSelfUpdateState,
   isSelfUpdateEnabled,
   isLocalhostRequest,
+  hasTrustedCallerAddress,
   resetSelfUpdateStateForTests,
   runSelfUpdate,
   selfUpdateGuard,
@@ -81,12 +82,12 @@ test("plain request URLs do not prove a localhost caller", () => {
   );
 });
 
-test("next route localhost URLs prove localhost route callers", () => {
+test("next route localhost URLs fail closed without trusted runtime caller addresses", () => {
   process.env.TASKIX_ENABLE_SELF_UPDATE = "true";
 
   assert.equal(
     selfUpdateGuard(new NextRequest("http://127.0.0.1:8000/api/self-update/update", { method: "POST" })).ok,
-    true
+    false
   );
   assert.equal(
     selfUpdateGuard(
@@ -95,11 +96,43 @@ test("next route localhost URLs prove localhost route callers", () => {
         headers: { "x-forwarded-for": "203.0.113.10", host: "example.com" }
       })
     ).ok,
-    true
+    false
   );
   assert.equal(
-    selfUpdateGuard(new NextRequest("http://example.com/api/self-update/update", { method: "POST" })).ok,
+    selfUpdateGuard(
+      new NextRequest("http://localhost:8000/api/self-update/update", {
+        method: "POST",
+        headers: { host: "127.0.0.1:8000" }
+      })
+    ).ok,
     false
+  );
+});
+
+test("self-update state reports trusted caller validation availability", () => {
+  process.env.TASKIX_ENABLE_SELF_UPDATE = "true";
+
+  const routeRequest = new NextRequest("http://127.0.0.1:8000/api/self-update");
+  const trustedRequest = {
+    headers: new Headers({ host: "example.com" }),
+    remoteAddress: "127.0.0.1"
+  };
+
+  assert.equal(hasTrustedCallerAddress(routeRequest), false);
+  assert.deepEqual(
+    pickValidationState(getSelfUpdateState(routeRequest)),
+    {
+      trustedCallerAddressAvailable: false,
+      trustedLocalhostCallerValidated: false
+    }
+  );
+  assert.equal(hasTrustedCallerAddress(trustedRequest), true);
+  assert.deepEqual(
+    pickValidationState(getSelfUpdateState(trustedRequest)),
+    {
+      trustedCallerAddressAvailable: true,
+      trustedLocalhostCallerValidated: true
+    }
   );
 });
 
@@ -128,6 +161,7 @@ test("localhost detection accepts loopback address forms", () => {
   assert.equal(isLocalhostRequest(localRequest("127.0.0.1")), true);
   assert.equal(isLocalhostRequest(localRequest("::1")), true);
   assert.equal(isLocalhostRequest(localRequest("::ffff:127.0.0.1")), true);
+  assert.equal(isLocalhostRequest(localRequest("localhost")), false);
 });
 
 test("successful update runs commands in order and enables restart", async () => {
@@ -176,4 +210,11 @@ function localHeaders() {
 
 function localRequest(ip) {
   return { headers: new Headers(), ip };
+}
+
+function pickValidationState(state) {
+  return {
+    trustedCallerAddressAvailable: state.trustedCallerAddressAvailable,
+    trustedLocalhostCallerValidated: state.trustedLocalhostCallerValidated
+  };
 }
