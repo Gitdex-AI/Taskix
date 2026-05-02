@@ -1,105 +1,210 @@
 # Taskix
 
-Taskix is a local-first orchestration server for running Codex-powered software teams.
+Taskix is a local-first control plane for running Codex-powered software teams against GitHub issues and pull requests.
 
-It provides a web console and Telegram bot interface for turning a product request into a tracked workflow across fixed AI roles:
+It turns a product request into a tracked delivery flow with fixed AI roles:
 
-- Product Manager: clarifies requirements and keeps the user conversation available.
-- Architect: decomposes confirmed requirements into GitHub issues, reviews PRs, and controls merge readiness.
-- Developer: works on one issue at a time with explicit directory ownership.
-- QA: validates PRs against acceptance criteria before merge.
-- DevOps: discusses and prepares deployment/CD setup.
+- Product Manager: clarifies requirements with the user and produces a handoff.
+- Architect: turns requirements into GitHub issues, reviews implementation, resolves specification blockers, and controls merge readiness.
+- Developer: implements one GitHub issue at a time inside explicit owned paths.
+- QA: validates pull requests against issue requirements and acceptance criteria.
+- DevOps: handles deployment planning, release operations, and production follow-up.
 
-Taskix uses GitHub issues, PRs, labels, and local SQLite state as the workflow backbone. It calls the local `codex` CLI directly instead of using a hosted API.
+Taskix uses the local `codex` CLI, the local `gh` CLI, GitHub issues/PRs/labels, and local SQLite state. It is designed to keep the backend deterministic: the server queues work, passes context between agents, stores state, and syncs GitHub; agents make the judgment calls.
 
-## Status
+## Current Capabilities
 
-This project is an early MVP. It is useful for experimenting with AI role orchestration, GitHub issue-driven workflows, and local Codex automation.
+- Next.js 16 web console and API server.
+- First-run admin setup and login-protected console.
+- Project setup bound to a GitHub repository.
+- Local SQLite storage in `data/taskix.sqlite`.
+- GitHub account setup, SSH key generation, repo discovery, issue creation, PR lookup, labels, comments, review, and merge operations through `gh`.
+- Codex CLI status checks and long-running agent sessions.
+- PM, Architect, Developer, QA, and DevOps sessions with persistent chat and execution logs.
+- Structured PM handoff to create a requirement record.
+- Requirement IDs such as `WF-YYYYMMDD-NNN`.
+- Architect issue planning with explicit developer roles, owned paths, acceptance criteria, and issue-number dependencies.
+- GitHub issue tracking as the main execution object after planning.
+- Developer worktree isolation under `data/taskix-workspaces/`.
+- Developer PR creation/recovery and retry after failed QA.
+- QA validation with comments and `taskix:qa-*` labels.
+- Architect code review before merge.
+- Architect merge jobs after QA and review pass.
+- Specification blocker escalation back to Architect from Developer or QA.
+- Auto Run for issue lists: Taskix keeps running any currently runnable issue stage, including parallel work where dependencies allow it.
+- Auto Run pause, stop, resume, and persisted state across refreshes.
+- Per-issue controls: `Run Dev`, `Run QA`, `Run Review`, and `Run Merge`.
+- Live job status and Codex output in the chat window.
+- GitHub sync and triage views.
+- Self-update UI for pulling/building the latest Taskix code and requesting a service restart when configured.
+- Optional Telegram PM entry point.
 
-Implemented:
+## Workflow Model
 
-- Next.js web console and API server in one process.
-- Project management with GitHub repo binding.
-- Local SQLite storage.
-- Codex CLI status checks and cached results.
-- GitHub CLI (`gh`) status checks.
-- GitHub account setup with local SSH key generation.
-- Project creation that writes Taskix workflow rules into `AGENTS.md`.
-- Project chat for PM, Architect, and DevOps long-lived sessions.
-- PM handoff detection through structured JSON.
-- Workflow tracking IDs such as `WF-YYYYMMDD-NNN`.
-- Architect issue planning.
-- Server-created GitHub issues with Taskix labels.
-- Developer issue sessions that can open PRs.
-- Architect PR review and `need-qa` labeling.
-- QA session startup.
-- Workflow detail pages with issues, jobs, sessions, and timeline.
-- Blocked session handling with tool-vs-business blocker distinction.
-- Retry jobs for Codex/tool failures.
+Taskix separates work into three phases.
 
-Still evolving:
+### 1. Requirements Before GitHub
 
-- Robust background worker and watchdog handling.
-- Full QA pass/fail automation loop.
-- Final architect merge automation.
-- Deployment/CD execution.
-- GitHub webhook-driven synchronization.
+The user talks with the PM until the requirement is clear enough to hand over.
+
+The PM produces structured handoff JSON with:
+
+- the confirmed requirement,
+- constraints,
+- acceptance criteria,
+- open questions, if any.
+
+Taskix records this as a requirement. Requirements may be created while other requirements are still running; workflows are not assumed to be serial.
+
+### 2. GitHub Issue Tracking
+
+After the Architect receives a requirement, GitHub becomes the source of execution tracking.
+
+The Architect creates one or more GitHub issues. Each issue should include:
+
+- a clear title and requirement,
+- acceptance criteria,
+- developer role,
+- owned paths,
+- dependencies by GitHub issue number,
+- whether work can run in parallel or must wait for another issue.
+
+Each issue then moves through these role-owned stages:
+
+```text
+Run Dev -> Run QA -> Run Review -> Run Merge -> done
+```
+
+Rules:
+
+- Developer implements and opens or updates a PR.
+- QA validates the PR. If QA fails, the issue returns to Developer.
+- QA or Developer may mark an issue as specification-blocked when the issue cannot be safely implemented or validated without Architect clarification.
+- Architect resolves specification blockers by updating issue scope, acceptance criteria, or owned paths, then queues Developer retry.
+- Architect reviews code after QA passes.
+- Architect merges only after QA passes and review marks the PR ready.
+- The backend does not hand-roll conflict resolution or code judgment; those decisions are delegated to Codex agents.
+
+### 3. Post-GitHub Operations
+
+After issues are merged, DevOps owns deployment and operational follow-up:
+
+- deployment setup,
+- release automation,
+- rollback planning,
+- incident analysis,
+- production follow-up.
+
+If operations uncover product or implementation work, DevOps should hand it back to Architect so a new GitHub issue can enter the normal issue-tracking phase.
+
+## Web Console
+
+The project page is split into the chat surface and a right-side workflow panel.
+
+The right-side panel is organized by phase:
+
+- Requirements: recent requirements and the entry to all requirements.
+- GitHub Issues: active issue list, issue labels, PR links, action buttons, and Auto Run.
+- Operations: DevOps and post-merge work.
+
+The GitHub issue list shows GitHub-backed labels as labels. Local execution state, such as a currently running Codex job, affects buttons and live status instead of being treated as a GitHub label.
+
+Issue actions are intentionally small:
+
+- `Run Dev`
+- `Run QA`
+- `Run Review`
+- `Run Merge`
+
+`Auto Run` runs whatever is currently runnable in the visible issue list. It can advance different issues in different stages at the same time, for example one issue in Dev and another in Review, as long as dependencies allow it. Auto Run can be paused, stopped, and resumed. Manual escalation to Architect pauses Auto Run so the user can take over a blocked flow without automatic work continuing underneath.
+
+The chat window shows agent messages, job status, elapsed time, and live Codex output. Finished jobs retain execution logs.
+
+## GitHub Labels
+
+Taskix creates and reads labels for durable GitHub workflow state.
+
+Common state labels:
+
+```text
+taskix:dev-running
+taskix:architect-review
+taskix:need-qa
+taskix:qa-running
+taskix:qa-passed
+taskix:qa-failed
+taskix:spec-blocked
+taskix:ready-to-merge
+taskix:merged
+taskix:deployed
+taskix:blocked
+taskix:superseded
+```
+
+Common role labels:
+
+```text
+role:backend_developer
+role:web_developer
+role:app_developer
+role:admin_developer
+role:devops_developer
+role:data_developer
+role:general_developer
+```
+
+Labels should be changed through Taskix or by an operator who understands the workflow. The UI treats GitHub labels as the visible badge source, while local job state controls button loading and live execution status.
 
 ## Architecture
 
 ```text
 src/app/          Next.js pages and API routes
 src/components/   Web UI components
-src/lib/          Codex, GitHub, Telegram, storage, orchestration logic
-docs/             Test and workflow documentation
-data/             Local runtime data, ignored by git
+src/lib/          Codex, GitHub, workflow, storage, auth, settings, and job logic
+scripts/          Node test suite
+data/             Local runtime state, ignored by git
 ```
 
-Key runtime dependencies:
+Important runtime files:
 
-- `codex` CLI for local AI agent execution.
-- `gh` CLI for GitHub repo, issue, PR, and label operations.
-- SQLite through Node.js `node:sqlite`.
-- Telegram Bot API if Telegram integration is enabled.
+```text
+data/taskix.sqlite              SQLite runtime database
+data/taskix-workspaces/         per-agent Git worktrees
+data/ssh/                       generated GitHub SSH keys
+```
 
 ## Requirements
 
 - Node.js with `node:sqlite` support.
 - npm.
-- GitHub CLI:
+- Authenticated GitHub CLI:
 
 ```bash
-gh auth login
+gh auth status
 ```
 
-- Codex CLI:
+- Authenticated Codex CLI:
 
 ```bash
 codex --version
 codex login
 ```
 
-Taskix expects `codex exec` to work locally before workflows can run.
+Taskix expects `codex exec` and `gh` operations to work on the host machine.
 
 ## Installation
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_ORG/taskix.git
-cd taskix
+git clone git@github.com:Taskix-AI/Taskix.git
+cd Taskix
 ```
 
 Install dependencies:
 
 ```bash
 npm install
-```
-
-Create a local environment file:
-
-```bash
-cp .env.example .env
 ```
 
 Start the development server:
@@ -114,11 +219,11 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The default dev script binds to `127.0.0.1:8000`.
+The dev server binds to `127.0.0.1:8000`.
 
 ## Configuration
 
-Most settings can be configured in the web console.
+Most settings are configured in the web console.
 
 Useful environment variables:
 
@@ -136,107 +241,85 @@ GITHUB_TOKEN=
 GITHUB_REPO=owner/repo
 GITHUB_API_URL=https://api.github.com
 DATA_DIR=./data
+
+TASKIX_ENABLE_SELF_UPDATE=true
+TASKIX_NEXT_SERVICE_MANAGER=pm2
+TASKIX_NEXT_SERVICE_NAME=taskix-next
 ```
 
-Runtime settings are stored in local SQLite at:
+`data/` is local runtime state and must not be committed.
+
+## Project Setup
+
+1. Open Settings and verify Codex and GitHub CLI status.
+2. Configure a GitHub account or organization.
+3. Generate or register the SSH key if needed.
+4. Create a project and bind it to a GitHub repository.
+5. Let Taskix update the repo's `AGENTS.md` workflow section.
+6. Open the project page and start from the PM chat.
+
+Taskix preserves content outside its managed `AGENTS.md` block.
+
+## Development
+
+Run the automated test suite:
+
+```bash
+npm test
+```
+
+Run type checks:
+
+```bash
+npm run typecheck
+```
+
+Build:
+
+```bash
+npm run build
+```
+
+Start the production server:
+
+```bash
+npm start
+```
+
+Focused issue-run policy test:
+
+```bash
+npm run test:issue-run
+```
+
+## Security Notes
+
+Do not commit local runtime data.
+
+Ignored or sensitive local data includes:
 
 ```text
-data/taskix.sqlite
+data/
+node_modules/
+.next/
+.env
+.env.local
 ```
 
-Do not commit `data/`.
+`data/` may contain:
 
-## Web Console Usage
+- SQLite workflow state,
+- Codex session data,
+- GitHub SSH private keys,
+- cached tool status,
+- local Git worktrees,
+- project and workflow history.
 
-### 1. Check tools
+Treat it as sensitive.
 
-Open `Tools` or `Settings` and verify:
+## Telegram
 
-- Codex CLI is installed.
-- Codex login works.
-- The selected model is available.
-- `gh` is installed and authenticated.
-
-Taskix does not run Codex checks automatically on every page load. It stores the last result and lets the user manually check again.
-
-### 2. Configure GitHub account
-
-Open Settings and configure a GitHub account:
-
-- Enter a GitHub username or organization.
-- Generate an SSH key.
-- Add the public key to GitHub.
-- Verify `gh auth status`.
-
-This allows Taskix to list repos, create issues, update labels, and write `AGENTS.md`.
-
-### 3. Add a project
-
-Open Projects and create a project.
-
-Required fields:
-
-- Project name.
-- GitHub account or organization.
-- GitHub repository.
-- Agent instructions file path, usually `AGENTS.md`.
-- Auto deploy preference.
-
-When the project is created, Taskix writes a managed workflow section into the target repo's `AGENTS.md`. Existing content outside the managed block is preserved.
-
-### 4. Chat with the PM
-
-Open a project page.
-
-Use the PM chat to describe a requirement. The PM should respond naturally until the requirement is confirmed. Once ready, the PM returns a structured handoff JSON containing:
-
-```json
-{
-  "status": "ready_for_architect",
-  "requirement": "clear implementation requirement",
-  "constraints": [],
-  "acceptanceCriteria": [],
-  "openQuestions": []
-}
-```
-
-Taskix detects this and shows `Start Workflow`.
-
-### 5. Start workflow
-
-Click `Start Workflow`.
-
-Taskix creates a workflow record, assigns a tracking code, starts the architect workflow, writes GitHub issues, and starts developer work through jobs.
-
-Workflow details are available at:
-
-```text
-/projects/:projectId/workflows/:workflowId
-```
-
-The workflow detail page shows:
-
-- Requirement.
-- Issues.
-- GitHub issue links.
-- PR links.
-- Developer and QA sessions.
-- Jobs.
-- Timeline.
-
-### 6. Handle blockers
-
-Blocked sessions show the exact blocker reason.
-
-If the blocker is a tool/runtime problem, such as Codex usage limits, auth failures, or GitHub API/network issues, Taskix shows `Retry Codex`.
-
-If the blocker is a business/workflow problem, such as invalid owned paths or ambiguous acceptance criteria, Taskix shows `Send to Architect`.
-
-The architect can resolve business blockers by updating issue scope and queueing developer retry jobs.
-
-## Telegram Usage
-
-Telegram support is optional.
+Telegram support is optional and primarily routes messages into the selected project's PM session.
 
 Configure:
 
@@ -261,93 +344,6 @@ Commands:
 /current
 /status <workflow_id>
 ```
-
-After selecting a project, normal messages are sent to that project's PM session.
-
-## GitHub Labels
-
-Taskix creates and uses labels such as:
-
-```text
-taskix:planned
-taskix:dev-running
-taskix:pr-opened
-taskix:architect-review
-taskix:need-qa
-taskix:qa-running
-taskix:qa-passed
-taskix:qa-failed
-taskix:ready-to-merge
-taskix:merged
-taskix:deployed
-taskix:blocked
-role:backend_developer
-role:web_developer
-role:app_developer
-role:admin_developer
-role:devops_developer
-role:data_developer
-role:general_developer
-```
-
-Labels are part of the workflow state and should not be edited casually.
-
-## Development
-
-Run type checks:
-
-```bash
-npm run typecheck
-```
-
-Build:
-
-```bash
-npm run build
-```
-
-Start production server:
-
-```bash
-npm start
-```
-
-## Security Notes
-
-Do not commit local runtime data.
-
-Ignored by default:
-
-```text
-data/
-node_modules/
-.next/
-.env
-.env.local
-firstApp/
-firstApp-*/
-*-issue*/
-```
-
-`data/` may contain:
-
-- SQLite runtime state.
-- Codex local state.
-- GitHub SSH private keys.
-- Cached tool status.
-- Project and workflow history.
-
-Treat it as sensitive.
-
-## Roadmap
-
-- Background worker process for jobs.
-- Job watchdog and stale-running recovery.
-- GitHub webhook synchronization.
-- More reliable QA and merge automation.
-- DevOps/CD workflow generation.
-- Better session logs and live streaming output.
-- Multi-user authorization for the web console.
 
 ## License
 
