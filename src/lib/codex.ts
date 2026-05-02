@@ -14,6 +14,7 @@ import type { Settings } from "@/lib/types";
 
 type CodexTextResult = { text: string; sessionId?: string | null; executionLog?: string };
 type RunJsonOptions = { cwd?: string };
+type RunTextOptions = { cwd?: string };
 type RunCodexOptions = { cwd?: string };
 const execFileAsync = promisify(execFile);
 const codexTimeoutMs = 10 * 60 * 1000;
@@ -93,14 +94,21 @@ ${input.message}`;
     message: string;
     sessionId?: string | null;
   }): Promise<CodexTextResult> {
+    const workspaceDir = await this.prepareArchitectWorkspace(input.githubRepo, input.projectName);
     const prompt = `${rolePrompts.architect}
 
 Project: ${input.projectName}
 GitHub repo: ${input.githubRepo}
+Workspace: ${workspaceDir}
+
+Hard rules:
+- Do not modify the current Taskix app checkout or its .git directory.
+- The current working directory is the isolated architect clone: ${workspaceDir}.
+- Run git and gh commands only in the current working directory unless explicitly inspecting GitHub metadata with gh.
 
 User message:
 ${input.message}`;
-    const result = await this.runText(prompt, input.sessionId);
+    const result = await this.runText(prompt, input.sessionId, { cwd: workspaceDir });
     return (
       result ?? {
         text: "Architect mock response: I captured this project context and can review architecture, issue ownership, merge readiness, and deployment strategy.",
@@ -115,6 +123,7 @@ ${input.message}`;
     blockedContext: string;
     sessionId?: string | null;
   }): Promise<{ resolution: ArchitectBlockerResolution; sessionId?: string | null }> {
+    const workspaceDir = await this.prepareArchitectWorkspace(input.githubRepo, input.projectName);
     const schema = objectSchema({
       action: { type: "string", enum: ["retry_developer", "request_user_input", "mark_blocked"] },
       summary: { type: "string" },
@@ -129,6 +138,7 @@ ${input.message}`;
 
 Project: ${input.projectName}
 GitHub repo: ${input.githubRepo}
+Workspace: ${workspaceDir}
 
 You are resolving a blocked Taskix workflow, not just giving advice.
 
@@ -139,11 +149,14 @@ Resolution rules:
 - If the blocker needs a user decision that cannot be inferred, return action "request_user_input" and put the exact question in comment.
 - Only return action "mark_blocked" if the issue cannot proceed safely.
 - Do not return general advice. Return a concrete executable resolution.
+- Do not modify the current Taskix app checkout or its .git directory.
+- The current working directory is the isolated architect clone: ${workspaceDir}.
+- Run git and gh commands only in the current working directory unless explicitly inspecting GitHub metadata with gh.
 
 Blocked context:
 ${input.blockedContext}`;
 
-    const result = await this.runJsonResult<ArchitectBlockerResolution>(prompt, schema);
+    const result = await this.runJsonResult<ArchitectBlockerResolution>(prompt, schema, { cwd: workspaceDir });
     const resolution = result.value;
     return {
       resolution: resolution ? { ...resolution, executionLog: result.executionLog } : {
@@ -427,6 +440,7 @@ Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied t
     issueNumber: number;
     prUrl: string;
   }): Promise<ArchitectPrReviewResult> {
+    const workspaceDir = await this.prepareArchitectWorkspace(input.repo, `review-issue-${input.issueNumber}`);
     const schema = objectSchema({
       decision: { type: "string", enum: ["ready_to_merge", "changes_requested", "blocked"] },
       summary: { type: "string" },
@@ -438,6 +452,7 @@ Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied t
 GitHub repo: ${input.repo}
 Issue: #${input.issueNumber}
 PR: ${input.prUrl}
+Workspace: ${workspaceDir}
 Project deployment policy: manual deployment. This review stage must not merge, but an approved PR should proceed to the dedicated merge step.
 
 Task:
@@ -453,9 +468,12 @@ Hard rules:
 - Return "ready_to_merge" only when QA has passed and the PR satisfies the issue acceptance criteria.
 - Return "changes_requested" if implementation changes are required.
 - Return "blocked" if readiness cannot be determined from available GitHub state.
+- Do not modify the current Taskix app checkout or its .git directory.
+- The current working directory is the isolated architect clone: ${workspaceDir}.
+- Run git and gh commands only in the current working directory unless explicitly inspecting GitHub metadata with gh.
 
 Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied to an empty array.`;
-    const result = await this.runJsonResult<ArchitectPrReviewResult>(prompt, schema);
+    const result = await this.runJsonResult<ArchitectPrReviewResult>(prompt, schema, { cwd: workspaceDir });
     return result.value ? { ...result.value, executionLog: result.executionLog } : {
       decision: "blocked",
       summary: `Architect runner did not complete manual ready review for ${input.prUrl}.`,
@@ -669,11 +687,11 @@ Summarize code review outcome, merge readiness, and deployment status according 
     }
   }
 
-  private async runText(prompt: string, sessionId?: string | null): Promise<CodexTextResult | null> {
+  private async runText(prompt: string, sessionId?: string | null, options: RunTextOptions = {}): Promise<CodexTextResult | null> {
     const tmp = await this.tmpDir();
     const outputPath = path.join(tmp, "output.txt");
     const args = sessionId ? ["resume", "--skip-git-repo-check", "--model", this.settings.codexModel, "-o", outputPath, sessionId, prompt] : ["--skip-git-repo-check", "--sandbox", this.settings.codexSandbox, ...approvalArgs(this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, prompt];
-    const result = await this.runCodex(args);
+    const result = await this.runCodex(args, { cwd: options.cwd });
     if (!result.ok) return null;
     try {
       return { text: (await readFile(outputPath, "utf8")).trim(), sessionId: extractSessionId(result.stderr) ?? sessionId, executionLog: formatCodexExecutionLog(result.stdout, result.stderr) };
@@ -783,6 +801,28 @@ Summarize code review outcome, merge readiness, and deployment status according 
       }
     }
 
+    await checkoutWorkspaceBase(workspaceDir);
+    return workspaceDir;
+  }
+
+  private async prepareArchitectWorkspace(repo: string, context: string): Promise<string> {
+    const workspaceRoot = path.join(dataDir, "taskix-workspaces");
+    await mkdir(workspaceRoot, { recursive: true });
+    const baseDir = path.join(workspaceRoot, sanitizePathSegment(`architect-${context}`));
+    const workspaceDir = await chooseWorkspaceDir(baseDir);
+
+    if (!existsSync(path.join(workspaceDir, ".git"))) {
+      await mkdir(path.dirname(workspaceDir), { recursive: true });
+      await execFileAsync("gh", ["repo", "clone", repo, workspaceDir]);
+      await checkoutWorkspaceBase(workspaceDir);
+      return workspaceDir;
+    }
+
+    try {
+      await execFileAsync("git", ["-C", workspaceDir, "fetch", "origin", "--prune"]);
+    } catch {
+      // A stale architect clone is still safer than running inside the app checkout.
+    }
     await checkoutWorkspaceBase(workspaceDir);
     return workspaceDir;
   }
