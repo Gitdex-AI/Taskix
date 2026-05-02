@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createJob, getAgentSession, getProject, listJobs } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
+import { requestAutoRunPause } from "@/lib/auto-run-control";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ projectId: string; sessionKey: string }> }) {
   const unauthorized = await requireConsoleApiAuth();
@@ -28,6 +29,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       sessionKey: session.sessionKey
     }
   });
+  requestAutoRunPause(project.projectId, "Auto Run pause requested because a blocked issue was manually sent to Architect.");
 
   return NextResponse.json({
     ok: true,

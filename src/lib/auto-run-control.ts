@@ -31,6 +31,13 @@ export function isActiveAutoRunState(state: AutoRunState | null): boolean {
   return Boolean(state && activeStatuses.has(state.status));
 }
 
+export function requestAutoRunPause(projectId: string, message: string): AutoRunState | null {
+  const state = getAutoRunState(projectId);
+  if (!state || !isActiveAutoRunState(state)) return state;
+  if (state.status !== "running") return state;
+  return updateAutoRunState(projectId, { status: "pause_requested", message });
+}
+
 export function startAutoRunState(projectId: string, input: { workflowIds: string[]; issueIds: string[] }): AutoRunState {
   const now = new Date().toISOString();
   const state: AutoRunState = {
