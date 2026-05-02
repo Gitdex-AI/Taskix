@@ -329,7 +329,8 @@ Current active branch: ${input.activeBranch ?? "none"}
 Returned from QA: ${input.returnedFromQa ? "yes" : "no"}
 
 Task:
-- Read issue #${input.issueNumber}, labels, linked PRs, and latest comments with gh. Treat GitHub as the source of truth for requirements, ownedPaths, acceptance criteria, dependencies, and prior QA/architect feedback.
+- Read issue #${input.issueNumber}, labels, linked PRs, and the full issue/PR comment timeline with gh. Treat GitHub as the source of truth for requirements, ownedPaths, acceptance criteria, dependencies, and prior QA/architect feedback.
+- Do not rely only on the latest comment. Understand the whole issue history, including earlier QA failures, QA passes, architect blockers, developer retries, and whether the same requirement is cycling between incompatible fixes.
 - Implement or update the active PR according to that GitHub context.
 - If QA/architect comments conflict, follow the newest relevant comment and the current Taskix workflow rules. Treat older conflicting QA findings as superseded by newer QA feedback.
 
@@ -346,6 +347,7 @@ Hard rules:
 - Implement the issue, run relevant tests, commit, and push the branch. Do not run gh pr create.
 - Do not add/remove GitHub labels or comments. Taskix server will create/update the PR and labels after you return JSON.
 - If implementation is blocked, return JSON with prUrl as an empty string and explain the blocker in summary.
+- Before returning any blocked result or making another follow-up fix after QA failed, explicitly decide whether this is developer work or architect work. If the current issue remains executable and the fix is clear, continue as developer. If the problem requires changing or clarifying the issue, return blockedType "spec".
 - Set blockedType:
   - "none" when a PR was created or updated.
   - "implementation" when you are blocked by a normal implementation or tooling problem that developer can resolve on retry.
@@ -490,7 +492,8 @@ Expected PR head SHA: ${input.headSha ?? "not captured"}
 Workspace: ${workspaceDir}
 
 Task:
-- Read the issue, acceptance criteria, ownedPaths, PR diff, labels, and comments with gh. Treat GitHub as the source of truth.
+- Read the issue, acceptance criteria, ownedPaths, PR diff, labels, and the full issue/PR comment timeline with gh. Treat GitHub as the source of truth.
+- Do not rely only on the latest comment. Understand the whole issue history, including earlier QA failures, QA passes, architect blockers, developer retries, and whether the same requirement is cycling between incompatible fixes.
 - Validate the captured PR version against the GitHub issue and comments.
 
 Hard rules:
@@ -498,6 +501,7 @@ Hard rules:
 - Do not create/edit GitHub issues, PRs, labels, or comments. Taskix server will publish QA evidence and labels after you return JSON.
 - Enforce ownedPaths, but allow minimal changes to automated test files that directly verify this issue's acceptance criteria, even when the architect omitted those test files from ownedPaths. Do not fail QA for that narrow test-scope exception; mention it in summary if relevant.
 - When passing QA, include concise verification evidence in summary, including commands run and any observable state required by acceptance criteria.
+- Before every failed result, explicitly re-evaluate whether the issue should return to developer or architect. If the current issue remains executable and the developer can fix it without changing the issue, use failureType "implementation". If the issue needs clarification or policy/architecture changes before a developer can know the correct fix, use failureType "spec".
 - Classify the result with failureType:
   - "none" only when passed is true.
   - "implementation" when the issue requirements are clear and the PR implementation does not satisfy them. These go back to developer.
