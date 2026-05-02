@@ -713,6 +713,7 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
     const canMerge = Boolean(issue.prUrl) && reviewed && issue.prState !== "MERGED";
     const activeJob = latestIssueJob(issue.issueId, jobs);
     const completedDeveloperJob = latestIssueJob(issue.issueId, jobs, "issue_run", "done");
+    const canRunDev = canRunDeveloperIssue(issue, workflow.issues);
     const isHighlighted = activeJob?.jobId === queuedJobId;
     const issueJobStatus = activeJob ? readableIssueJobStatus(activeJob) : null;
     const prNumber = extractPullRequestNumber(issue.prUrl);
@@ -752,7 +753,8 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
               qaStatusId: qaStatus.id,
               canHandoffToQa,
               canArchitectReview,
-              canMerge
+              canMerge,
+              canRunDev
             })}
           </Group>
         </Group>
@@ -770,6 +772,7 @@ function renderIssueStageAction(input: {
   canHandoffToQa: boolean;
   canArchitectReview: boolean;
   canMerge: boolean;
+  canRunDev: boolean;
 }): ReactNode {
   if (input.activeJob?.status === "pending") return <ProjectRunJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />;
   if (input.activeJob?.status === "running") return <RunningActionButton label={runningLabelForJob(input.activeJob)} />;
@@ -778,8 +781,28 @@ function renderIssueStageAction(input: {
   if (input.canMerge) return <ProjectMergePrButton projectId={input.projectId} issueId={input.issue.issueId} prUrl={input.issue.prUrl} />;
   if (input.canArchitectReview) return <ProjectArchitectReviewButton projectId={input.projectId} issueId={input.issue.issueId} />;
   if (input.canHandoffToQa || (input.issue.prUrl && input.qaStatusId === "needed")) return <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} />;
+  if (input.canRunDev) return <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />;
   if (!input.issue.prUrl && input.completedDeveloperJob) return <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />;
   return null;
+}
+
+function canRunDeveloperIssue(issue: IssueRecord, issues: IssueRecord[]): boolean {
+  if (issue.prUrl || issue.prState === "MERGED" || issue.githubState === "CLOSED") return false;
+  const labels = [...(issue.labels ?? []), ...(issue.prLabels ?? [])].map((label) => label.toLowerCase());
+  if (labels.some((label) => ["taskix:dev-running", "taskix:pr-opened", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge", "taskix:merged"].includes(label))) return false;
+  const dependencies = issue.dependsOn ?? [];
+  if (!dependencies.length) return true;
+  return dependencies.every((dependency) => {
+    const normalized = dependency.trim().toLowerCase();
+    const upstream = issues.find((candidate) => (
+      candidate.issueId.toLowerCase() === normalized
+      || candidate.title.toLowerCase() === normalized
+      || String(candidate.githubIssueNumber ?? "") === normalized.replace(/^#/, "")
+    ));
+    if (!upstream) return false;
+    const upstreamLabels = [...(upstream.labels ?? []), ...(upstream.prLabels ?? [])].map((label) => label.toLowerCase());
+    return upstream.prState === "MERGED" || upstream.githubState === "CLOSED" || upstreamLabels.some((label) => label === "taskix:merged" || label === "taskix:deployed");
+  });
 }
 
 function runLabelForJob(job: JobRecord): string {
