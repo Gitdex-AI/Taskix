@@ -9,6 +9,7 @@ import { ProjectArchitectReviewButton } from "@/components/ProjectArchitectRevie
 import { ProjectHandoffForm } from "@/components/ProjectHandoffForm";
 import { ProjectHandoffToQaButton } from "@/components/ProjectHandoffToQaButton";
 import { ProjectMergePrButton } from "@/components/ProjectMergePrButton";
+import { ProjectPhaseSwitcher } from "@/components/ProjectPhaseSwitcher";
 import { ProjectRetryJobButton } from "@/components/ProjectRetryJobButton";
 import { ProjectReturnToDeveloperButton } from "@/components/ProjectReturnToDeveloperButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
@@ -136,18 +137,53 @@ export default async function ProjectDetailPage({
             </Group>
             <Stack p="md">
               <ProjectAutoRunJob projectId={project.projectId} enabled={query.autorun === "1"} />
-              <ProjectPhaseSummary projectId={project.projectId} workflows={sortedWorkflows} jobs={jobs} selectedPhase={selectedPhase} />
-              <ThreePhaseWorkflowPanel
-                projectId={project.projectId}
-                selectedPhase={selectedPhase}
-                isInspectingIssueSession={isInspectingIssueSession}
-                readyForArchitectPayload={readyForArchitectPayload}
-                pmSession={pmSession}
-                workflows={visibleActiveWorkflows}
-                doneWorkflows={doneWorkflows}
-                sessions={sessions}
-                jobs={jobs}
-                queuedJobId={queuedJobId}
+              <ProjectPhaseSwitcher
+                initialPhase={selectedPhase}
+                counts={getPhaseCounts(sortedWorkflows, jobs)}
+                content={{
+                  requirements: (
+                    <ThreePhaseWorkflowPanel
+                      projectId={project.projectId}
+                      selectedPhase="requirements"
+                      isInspectingIssueSession={isInspectingIssueSession}
+                      readyForArchitectPayload={readyForArchitectPayload}
+                      pmSession={pmSession}
+                      workflows={visibleActiveWorkflows}
+                      doneWorkflows={doneWorkflows}
+                      sessions={sessions}
+                      jobs={jobs}
+                      queuedJobId={queuedJobId}
+                    />
+                  ),
+                  github: (
+                    <ThreePhaseWorkflowPanel
+                      projectId={project.projectId}
+                      selectedPhase="github"
+                      isInspectingIssueSession={isInspectingIssueSession}
+                      readyForArchitectPayload={readyForArchitectPayload}
+                      pmSession={pmSession}
+                      workflows={visibleActiveWorkflows}
+                      doneWorkflows={doneWorkflows}
+                      sessions={sessions}
+                      jobs={jobs}
+                      queuedJobId={queuedJobId}
+                    />
+                  ),
+                  operations: (
+                    <ThreePhaseWorkflowPanel
+                      projectId={project.projectId}
+                      selectedPhase="operations"
+                      isInspectingIssueSession={isInspectingIssueSession}
+                      readyForArchitectPayload={readyForArchitectPayload}
+                      pmSession={pmSession}
+                      workflows={visibleActiveWorkflows}
+                      doneWorkflows={doneWorkflows}
+                      sessions={sessions}
+                      jobs={jobs}
+                      queuedJobId={queuedJobId}
+                    />
+                  )
+                }}
               />
             </Stack>
           </Paper>
@@ -201,54 +237,24 @@ function normalizeSelectedPhase(value: string | undefined, hasUnqueuedPmHandoff:
   return hasUnqueuedPmHandoff ? "requirements" : "github";
 }
 
-function ProjectPhaseSummary({
-  projectId,
-  workflows,
-  jobs,
-  selectedPhase
-}: {
-  projectId: string;
-  workflows: WorkflowRecord[];
-  jobs: JobRecord[];
-  selectedPhase: WorkflowPhase;
-}) {
+function getPhaseCounts(workflows: WorkflowRecord[], jobs: JobRecord[]): {
+  requirements: number;
+  github: number;
+  operations: number;
+  readyJobs: number;
+} {
   const requirementCount = workflows.filter((workflow) => !workflow.issues.length || workflow.status === "created" || workflow.status === "ready_for_architect").length;
   const githubIssues = workflows.flatMap((workflow) => workflow.issues);
   const activeGithubIssues = githubIssues.filter((issue) => issue.githubState !== "CLOSED" && issue.prState !== "MERGED").length;
   const opsJobs = jobs.filter((job) => job.type !== "workflow_run" && job.type !== "issue_run" && job.type !== "qa_run").length;
   const readyJobs = jobs.filter((job) => job.status === "pending").length;
 
-  return (
-    <div className="phase-summary">
-      <PhaseStat projectId={projectId} phase="requirements" selectedPhase={selectedPhase} title="Requirements" value={requirementCount} detail="PM to architect handoff" />
-      <PhaseStat projectId={projectId} phase="github" selectedPhase={selectedPhase} title="GitHub issues" value={activeGithubIssues} detail={`${readyJobs} ready job${readyJobs === 1 ? "" : "s"}`} />
-      <PhaseStat projectId={projectId} phase="operations" selectedPhase={selectedPhase} title="Operations" value={opsJobs} detail="DevOps events after merge" />
-    </div>
-  );
-}
-
-function PhaseStat({
-  projectId,
-  phase,
-  selectedPhase,
-  title,
-  value,
-  detail
-}: {
-  projectId: string;
-  phase: WorkflowPhase;
-  selectedPhase: WorkflowPhase;
-  title: string;
-  value: number;
-  detail: string;
-}) {
-  return (
-    <a href={`/projects/${projectId}?phase=${phase}`} className={`phase-stat${selectedPhase === phase ? " active" : ""}`}>
-      <Text size="xs" fw={780}>{title}</Text>
-      <Text size="lg" fw={820}>{value}</Text>
-      <Text size="xs" c="dimmed">{detail}</Text>
-    </a>
-  );
+  return {
+    requirements: requirementCount,
+    github: activeGithubIssues,
+    operations: opsJobs,
+    readyJobs
+  };
 }
 
 function ThreePhaseWorkflowPanel(input: {

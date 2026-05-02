@@ -561,12 +561,16 @@ pre,
 
 .phase-stat {
   display: block;
+  width: 100%;
   min-width: 0;
   padding: 10px;
   background: #f8fafc;
   border: 1px solid #e0e7f0;
   border-radius: 8px;
   color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
 }
 
