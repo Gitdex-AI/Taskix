@@ -14,6 +14,7 @@ type TimelineMessage = AgentMessage & {
   sourceLabel: string;
   sourceRole: AgentSessionRecord["role"];
   session: AgentSessionRecord | null;
+  executionLogs?: TimelineExecutionLog[];
 };
 
 type TimelineExecutionLog = NonNullable<AgentSessionRecord["executionLogs"]>[number] & {
@@ -323,22 +324,7 @@ function MessageList({
   pending: boolean;
 }) {
   const messages = [
-    ...sessions.flatMap((session) => session.messages.map((message) => ({
-      ...message,
-      kind: "message",
-      sessionKey: session.sessionKey,
-      sourceLabel: message.role === "user" ? `You → ${chatRoleLabel(session.role, session.title, session.developerRole)}` : chatRoleLabel(session.role, session.title, session.developerRole),
-      sourceRole: session.role,
-      session
-    } satisfies TimelineMessage))),
-    ...sessions.flatMap((session) => (session.executionLogs ?? []).map((log) => ({
-      ...log,
-      kind: "execution-log",
-      sessionKey: session.sessionKey,
-      sourceLabel: chatRoleLabel(session.role, session.title, session.developerRole),
-      sourceRole: session.role,
-      session
-    } satisfies TimelineExecutionLog))),
+    ...sessions.flatMap((session) => timelineMessagesForSession(session)),
     ...(optimisticMessage ? [optimisticMessage] : [])
   ].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 
@@ -363,12 +349,14 @@ function MessageList({
                     <Badge variant="light">{message.sourceLabel}</Badge>
                     {message.session?.workflowId ? <Badge size="xs" variant="outline">{message.session.workflowId}</Badge> : null}
                     {message.session?.issueId ? <Badge size="xs" variant="outline">{message.session.issueId}</Badge> : null}
+                    {messageExecutionDuration(message) ? <Badge size="xs" color="gray" variant="light">{messageExecutionDuration(message)}</Badge> : null}
                   </Group>
                   <Text component="time" dateTime={message.createdAt} size="xs" c="dimmed">
                     {formatMessageTime(message.createdAt)}
                   </Text>
                 </Group>
                 <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
+                {message.executionLogs?.length ? <InlineExecutionLogs logs={message.executionLogs} /> : null}
               </div>
             </div>
           )
@@ -390,6 +378,35 @@ function MessageList({
       {runningStatus}
     </Stack>
   );
+}
+
+function timelineMessagesForSession(session: AgentSessionRecord): Array<TimelineMessage | TimelineExecutionLog> {
+  const logs = (session.executionLogs ?? []).map((log) => ({
+    ...log,
+    kind: "execution-log",
+    sessionKey: session.sessionKey,
+    sourceLabel: chatRoleLabel(session.role, session.title, session.developerRole),
+    sourceRole: session.role,
+    session
+  } satisfies TimelineExecutionLog));
+  const lastAssistantIndex = findLastIndex(session.messages, (message) => message.role === "assistant");
+  const messages = session.messages.map((message, index) => ({
+    ...message,
+    kind: "message",
+    sessionKey: session.sessionKey,
+    sourceLabel: message.role === "user" ? `You → ${chatRoleLabel(session.role, session.title, session.developerRole)}` : chatRoleLabel(session.role, session.title, session.developerRole),
+    sourceRole: session.role,
+    session,
+    executionLogs: index === lastAssistantIndex ? logs : undefined
+  } satisfies TimelineMessage));
+  return lastAssistantIndex === -1 ? [...messages, ...logs] : messages;
+}
+
+function findLastIndex<T>(items: T[], predicate: (item: T) => boolean): number {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index])) return index;
+  }
+  return -1;
 }
 
 function ExecutionLogItem({ log }: { log: TimelineExecutionLog }) {
@@ -418,8 +435,36 @@ function ExecutionLogItem({ log }: { log: TimelineExecutionLog }) {
   );
 }
 
+function InlineExecutionLogs({ logs }: { logs: TimelineExecutionLog[] }) {
+  return (
+    <div className="inline-execution-logs">
+      {logs.map((log, index) => (
+        <details key={`${log.createdAt}-${index}`}>
+          <summary>
+            <Group gap="xs" justify="space-between" wrap="nowrap">
+              <Group gap={6}>
+                <Badge size="xs" color={log.status === "failed" ? "red" : "green"} variant="light">execution log</Badge>
+                <Text size="xs" c="dimmed" lineClamp={1}>{log.title}</Text>
+              </Group>
+              <Text component="time" dateTime={log.createdAt} size="xs" c="dimmed">
+                {formatMessageTime(log.createdAt)}
+              </Text>
+            </Group>
+          </summary>
+          <pre className="execution-log-content">{log.content || "No Codex execution output captured."}</pre>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function executionLogDuration(log: TimelineExecutionLog): string | null {
   const durationMs = log.durationMs ?? log.session.durationMs ?? null;
+  return durationMs == null ? null : formatDuration(durationMs);
+}
+
+function messageExecutionDuration(message: TimelineMessage): string | null {
+  const durationMs = message.executionLogs?.[message.executionLogs.length - 1]?.durationMs ?? message.session?.durationMs ?? null;
   return durationMs == null ? null : formatDuration(durationMs);
 }
 

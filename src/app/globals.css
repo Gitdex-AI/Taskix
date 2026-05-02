@@ -1055,11 +1055,27 @@ pre,
   margin: 0;
 }
 
+.inline-execution-logs {
+  margin-top: 12px;
+}
+
+.inline-execution-logs details {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid #e5eaf2;
+}
+
+.inline-execution-logs details + details {
+  margin-top: 10px;
+}
+
+.inline-execution-logs summary,
 .execution-log-bubble summary {
   cursor: pointer;
   list-style: none;
 }
 
+.inline-execution-logs summary::-webkit-details-marker,
 .execution-log-bubble summary::-webkit-details-marker {
   display: none;
 }
