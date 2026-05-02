@@ -16,12 +16,70 @@ type CodexTextResult = { text: string; sessionId?: string | null; executionLog?:
 type RunJsonOptions = { cwd?: string };
 type RunTextOptions = { cwd?: string };
 type RunCodexOptions = { cwd?: string };
+type DeveloperWorktreeFacts = {
+  expectedBranch: string;
+  activePrBranch: string | null;
+  activePrHead: string | null;
+  activePrBase: string | null;
+  currentBranch: string | null;
+  currentHead: string | null;
+  baseBranch: string;
+  baseHead: string | null;
+  statusShort: string;
+  diffNameStatus: string;
+  diffAgainstActiveBranch: string;
+  fetchSummary: string;
+};
 const execFileAsync = promisify(execFile);
 const codexTimeoutMs = 10 * 60 * 1000;
 const ansiPattern = /\x1B\[[0-?]*[ -/]*[@-~]/g;
 
 function normalizeRuntimeOutput(chunk: Buffer | string): string {
   return String(chunk).replace(ansiPattern, "");
+}
+
+function formatDeveloperWorktreeFacts(facts: DeveloperWorktreeFacts): string {
+  return [
+    `- expectedBranch: ${facts.expectedBranch}`,
+    `- activePrBranch: ${facts.activePrBranch ?? "none"}`,
+    `- activePrHead: ${facts.activePrHead ?? "unknown"}`,
+    `- activePrBase: ${facts.activePrBase ?? "unknown"}`,
+    `- currentBranch: ${facts.currentBranch ?? "unknown"}`,
+    `- currentHead: ${facts.currentHead ?? "unknown"}`,
+    `- baseBranch: ${facts.baseBranch}`,
+    `- baseHead: ${facts.baseHead ?? "unknown"}`,
+    `- fetchSummary:\n${indentFact(facts.fetchSummary || "ok")}`,
+    `- git status --short --branch:\n${indentFact(facts.statusShort || "clean or unavailable")}`,
+    `- git diff --name-status:\n${indentFact(facts.diffNameStatus || "none")}`,
+    `- git diff --name-status origin/activePrBranch:\n${indentFact(facts.diffAgainstActiveBranch || "none or no active PR branch")}`
+  ].join("\n");
+}
+
+function indentFact(value: string): string {
+  return value.trim() ? value.trim().split("\n").map((line) => `  ${line}`).join("\n") : "  none";
+}
+
+function oneLine(value: string): string | null {
+  const line = value.trim().split("\n").find(Boolean)?.trim();
+  return line || null;
+}
+
+async function gitFact(cwd: string, args: string[]): Promise<string> {
+  try {
+    const { stdout, stderr } = await execFileAsync("git", ["-C", cwd, ...args]);
+    return [stdout.trim(), stderr.trim()].filter(Boolean).join("\n").slice(0, 6000);
+  } catch (error) {
+    return error instanceof Error ? error.message.slice(0, 6000) : String(error).slice(0, 6000);
+  }
+}
+
+async function ghJsonFact<T>(cwd: string, args: string[]): Promise<T | null> {
+  try {
+    const { stdout } = await execFileAsync("gh", args, { cwd });
+    return JSON.parse(stdout) as T;
+  } catch {
+    return null;
+  }
 }
 
 export type ArchitectBlockerResolution = {
@@ -334,15 +392,36 @@ Implementation must stay within owned paths unless the issue explicitly calls ou
       };
     }
     const baseBranch = expectedDeveloperBaseBranch();
+    const expectedBranch = `taskix/${input.workflowId}-issue-${input.issueNumber}`;
+    const worktreeFacts = await this.collectDeveloperWorktreeFacts({
+      repo: input.repo,
+      workspaceDir,
+      baseBranch,
+      expectedBranch,
+      activeBranch: input.activeBranch ?? null,
+      activePrUrl: input.activePrUrl ?? null
+    });
     const prompt = `${rolePrompts.developer}
 
 GitHub repo: ${input.repo}
 GitHub issue: #${input.issueNumber}
 Workspace: ${workspaceDir}
 Base branch: ${baseBranch ?? "repository default branch"}
+Expected issue branch: ${expectedBranch}
 Current active PR: ${input.activePrUrl ?? "none"}
 Current active branch: ${input.activeBranch ?? "none"}
 Returned from QA: ${input.returnedFromQa ? "yes" : "no"}
+
+System-collected worktree facts:
+${formatDeveloperWorktreeFacts(worktreeFacts)}
+
+Before editing:
+- First decide whether the worktree is on the correct target branch and whether the dirty state is safe to use.
+- If Current active PR is not "none", your target is that active PR branch. You may need to recover or update that branch, but do not implement on an unrelated branch.
+- If Current active PR is "none", your target is the expected issue branch.
+- Use the system-collected facts as facts, not as instructions to discard or keep changes. You must make the recovery decision from the GitHub issue/PR context.
+- If the branch is wrong, the worktree is dirty, or local changes conflict with the active PR branch, explain your recovery decision in the final summary.
+- If you cannot safely recover the worktree or cannot write the Git index, return blockedType "environment" with prUrl empty. Do not return blockedType "none" unless you pushed a commit to the active PR branch or created/pushed the expected issue branch.
 
 Task:
 - Read issue #${input.issueNumber}, labels, linked PRs, and the full issue/PR comment timeline with gh. Treat GitHub as the source of truth for requirements, ownedPaths, acceptance criteria, dependencies, and prior QA/architect feedback.
@@ -359,6 +438,7 @@ Hard rules:
 - Do not revert a directly related test update merely because an older QA comment called it outside ownedPaths; current Taskix policy allows that narrow test-scope exception.
 - If Current active PR is not "none", update that PR branch and return the same PR URL. Do not create a replacement PR unless the existing PR is closed or unusable.
 - If Returned from QA is "yes", address QA findings on the current active PR branch and push follow-up commits.
+- Do not continue implementation on the wrong branch merely because the code compiles locally.
 - When retrying after QA failure, do not patch only the exact reported symptom. Identify the underlying contract behind the QA finding.
 - If the QA finding involves a trust boundary, API contract, state machine, permissions model, lifecycle rule, dependency ordering, ownedPaths boundary, data consistency rule, or cross-component interaction, audit analogous paths and update the complete affected workflow.
 - Keep this audit scoped to the issue and ownedPaths. "Analogous paths" means paths necessary to satisfy the same contract for this issue, not unrelated broad refactors.
@@ -761,7 +841,6 @@ Summarize code review outcome, merge readiness, and deployment status according 
     if (!existsSync(path.join(workspaceDir, ".git"))) {
       await mkdir(path.dirname(workspaceDir), { recursive: true });
       await execFileAsync("gh", ["repo", "clone", repo, workspaceDir]);
-      await checkoutWorkspaceBase(workspaceDir);
       return workspaceDir;
     }
 
@@ -770,8 +849,53 @@ Summarize code review outcome, merge readiness, and deployment status according 
     } catch {
       // A stale clone is still a safer execution directory than the app checkout.
     }
-    await checkoutWorkspaceBase(workspaceDir);
     return workspaceDir;
+  }
+
+  private async collectDeveloperWorktreeFacts(input: {
+    repo: string;
+    workspaceDir: string;
+    baseBranch: string;
+    expectedBranch: string;
+    activeBranch: string | null;
+    activePrUrl: string | null;
+  }): Promise<DeveloperWorktreeFacts> {
+    const fetchSummary = await gitFact(input.workspaceDir, ["fetch", "origin", "--prune"]);
+    const prNumber = input.activePrUrl ? extractPullRequestNumber(input.activePrUrl) : null;
+    const activePr = prNumber ? await ghJsonFact<{ headRefName?: string; headRefOid?: string; baseRefName?: string }>(input.workspaceDir, [
+      "pr",
+      "view",
+      String(prNumber),
+      "--repo",
+      input.repo,
+      "--json",
+      "headRefName,headRefOid,baseRefName"
+    ]) : null;
+    const activePrBranch = activePr?.headRefName ?? input.activeBranch ?? null;
+    const activePrHead = activePr?.headRefOid ?? null;
+    const activePrBase = activePr?.baseRefName ?? input.baseBranch;
+    const currentBranch = oneLine(await gitFact(input.workspaceDir, ["branch", "--show-current"]));
+    const currentHead = oneLine(await gitFact(input.workspaceDir, ["rev-parse", "HEAD"]));
+    const baseHead = oneLine(await gitFact(input.workspaceDir, ["rev-parse", `origin/${input.baseBranch}`]));
+    const statusShort = await gitFact(input.workspaceDir, ["status", "--short", "--branch"]);
+    const diffNameStatus = await gitFact(input.workspaceDir, ["diff", "--name-status"]);
+    const diffAgainstActiveBranch = activePrBranch
+      ? await gitFact(input.workspaceDir, ["diff", "--name-status", `origin/${activePrBranch}`])
+      : "";
+    return {
+      expectedBranch: input.expectedBranch,
+      activePrBranch,
+      activePrHead,
+      activePrBase,
+      currentBranch,
+      currentHead,
+      baseBranch: input.baseBranch,
+      baseHead,
+      statusShort,
+      diffNameStatus,
+      diffAgainstActiveBranch,
+      fetchSummary
+    };
   }
 
   private async prepareQaWorkspace(repo: string, issueNumber: number, prUrl: string): Promise<string> {
