@@ -282,13 +282,13 @@ function findJobSession(job: JobRecord, sessions: AgentSessionRecord[]): AgentSe
 }
 
 function runningAgentLabel(job: JobRecord, session: AgentSessionRecord | null): string {
+  if (job.type === "workflow_run" || job.type === "architect_blocker_run" || job.type === "architect_review_run" || job.type === "merge_run") return "Architect";
+  if (job.type === "qa_run") return "QA";
+  if (job.type === "issue_run") return session?.developerRole ?? "Dev";
   if (session?.developerRole) return session.developerRole;
   if (session?.role === "developer") return "Dev";
   if (session?.role === "qa") return "QA";
   if (session?.role === "architect") return "Architect";
-  if (job.type === "issue_run") return "Dev";
-  if (job.type === "qa_run") return "QA";
-  if (job.type === "workflow_run" || job.type === "architect_blocker_run" || job.type === "architect_review_run" || job.type === "merge_run") return "Architect";
   return "Agent";
 }
 
