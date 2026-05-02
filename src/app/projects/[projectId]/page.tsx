@@ -273,7 +273,6 @@ function ThreePhaseWorkflowPanel(input: {
   jobs: JobRecord[];
   queuedJobId: string | null;
 }) {
-  const githubJobs = input.jobs.filter((job) => job.type === "issue_run" || job.type === "qa_run");
   const devopsSessions = input.sessions.filter((session) => session.role === "devops");
 
   if (input.selectedPhase === "requirements") {
@@ -296,8 +295,7 @@ function ThreePhaseWorkflowPanel(input: {
           <ProjectRunJobsForm projectId={input.projectId} label="Run Ready Jobs" />
         </Group>
         <Stack gap="xs" mt="sm">
-          {renderJobRows(input.projectId, githubJobs, input.queuedJobId)}
-          {renderGithubIssueRows(input.projectId, input.workflows, input.sessions)}
+          {renderGithubIssueRows(input.projectId, input.workflows, input.sessions, input.jobs, input.queuedJobId)}
         </Stack>
       </section>
     );
@@ -640,7 +638,7 @@ function renderDeveloperIssueRows(projectId: string, workflows: WorkflowRecord[]
   });
 }
 
-function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): ReactNode {
+function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[], jobs: JobRecord[], queuedJobId: string | null): ReactNode {
   const rows = workflows
     .flatMap((workflow) => workflow.issues.map((issue) => ({ workflow, issue })))
     .filter(({ issue }) => issue.githubState !== "CLOSED" && issue.prState !== "MERGED");
@@ -653,6 +651,9 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
     const canHandoffToQa = Boolean(issue.prUrl) && qaStatus.id === "not_requested";
     const canArchitectReview = Boolean(issue.prUrl) && qaPassed && !reviewed && issue.prState !== "MERGED";
     const canMerge = Boolean(issue.prUrl) && reviewed && issue.prState !== "MERGED";
+    const activeJob = latestIssueJob(issue.issueId, jobs);
+    const isHighlighted = activeJob?.jobId === queuedJobId;
+    const issueJobStatus = activeJob ? readableIssueJobStatus(activeJob) : null;
     const issueMetaParts = [
       workflow.trackingCode,
       issue.prState ? `PR ${issue.prState}` : issue.prUrl ? "PR open" : "no PR",
@@ -661,12 +662,13 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
     ].filter(Boolean);
 
     return (
-      <div key={issue.issueId} className="github-issue-row">
+      <div key={issue.issueId} className="github-issue-row" style={isHighlighted ? highlightedCardStyle : undefined}>
         <Group justify="space-between" align="flex-start" gap="sm" wrap="nowrap">
           <div style={{ minWidth: 0 }}>
             <Group gap={6} wrap="wrap">
               <Text size="sm" fw={780} lineClamp={1}>{issue.githubIssueNumber ? `#${issue.githubIssueNumber}` : issue.issueId}</Text>
               <Badge size="xs" variant="outline">{issue.developerRole ?? issue.assigneeRole}</Badge>
+              {issueJobStatus ? <Badge size="xs" color={issueJobStatus.color} variant="light">{issueJobStatus.label}</Badge> : null}
               <Badge size="xs" color={qaStatus.color} variant="light">{qaStatus.label}</Badge>
               {reviewed ? <Badge size="xs" color="green" variant="light">reviewed</Badge> : null}
             </Group>
@@ -679,6 +681,8 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
             ) : null}
           </div>
           <Group gap={6} wrap="wrap" justify="flex-end">
+            {activeJob?.status === "failed" ? <ProjectRetryJobButton projectId={projectId} jobId={activeJob.jobId} /> : null}
+            {activeJob?.status === "running" ? <ProjectRetryJobButton projectId={projectId} jobId={activeJob.jobId} status="running" /> : null}
             {canHandoffToQa ? <ProjectHandoffToQaButton projectId={projectId} issueId={issue.issueId} /> : null}
             {qaStatus.id === "failed" ? <ProjectReturnToDeveloperButton projectId={projectId} issueId={issue.issueId} /> : null}
             {canArchitectReview ? <ProjectArchitectReviewButton projectId={projectId} issueId={issue.issueId} /> : null}
@@ -688,6 +692,28 @@ function renderGithubIssueRows(projectId: string, workflows: WorkflowRecord[], s
       </div>
     );
   });
+}
+
+function latestIssueJob(issueId: string, jobs: JobRecord[]): JobRecord | null {
+  return jobs
+    .filter((job) => (job.type === "issue_run" || job.type === "qa_run") && job.payload.issueId === issueId)
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] ?? null;
+}
+
+function readableIssueJobStatus(job: JobRecord): { label: string; color: string } {
+  const owner = job.type === "qa_run" ? "QA" : "Development";
+  switch (job.status) {
+    case "pending":
+      return { label: `${owner} queued`, color: "blue" };
+    case "running":
+      return { label: `${owner} running`, color: "blue" };
+    case "failed":
+      return { label: `${owner} failed`, color: "red" };
+    case "done":
+      return { label: `${owner} done`, color: "green" };
+    case "cancelled":
+      return { label: `${owner} cancelled`, color: "gray" };
+  }
 }
 
 function renderQaIssueRows(projectId: string, workflows: WorkflowRecord[], sessions: AgentSessionRecord[]): ReactNode {
