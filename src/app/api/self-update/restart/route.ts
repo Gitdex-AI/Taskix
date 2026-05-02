@@ -1,44 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 import {
-  consumeRestartAvailability,
-  markSelfUpdateRestartFailed,
-  markSelfUpdateRestartRequested,
-  selfUpdateGuard
+  requestConfirmedSelfUpdateRestart,
+  selfUpdateGuard,
+  type SelfUpdateConfirmationInput
 } from "@/lib/self-update";
-import { requestTaskixServiceRestart } from "@/lib/taskix-service";
+import { restartTaskixService } from "@/lib/service-management";
 
 export async function POST(request: NextRequest) {
   const unauthorized = await requireConsoleApiAuth();
   if (unauthorized) return unauthorized;
-  const result = await requestTaskixServiceRestart({
-    source: request,
-    guard: selfUpdateGuard,
-    consumeRestartAvailability
-  });
-  if (!result.ok) {
-    markSelfUpdateRestartFailed(result.error ?? "Taskix service restart failed.");
-    return NextResponse.json(
-      {
-        ok: false,
-        restartRequested: false,
-        error: result.error,
-        manager: result.manager,
-        serviceName: result.serviceName,
-        stdout: result.stdout,
-        stderr: result.stderr
-      },
-      { status: result.status }
-    );
+  const guard = selfUpdateGuard(request);
+  if (!guard.ok) {
+    return NextResponse.json({ error: guard.error }, { status: guard.status });
   }
 
-  markSelfUpdateRestartRequested();
-  return NextResponse.json({
-    ok: true,
-    restartRequested: true,
-    manager: result.manager,
-    serviceName: result.serviceName,
-    stdout: result.stdout,
-    stderr: result.stderr
-  }, { status: result.status });
+  const response = await requestConfirmedSelfUpdateRestart(await readConfirmationPayload(request), restartTaskixService);
+  if (!response.ok || !response.restart) {
+    return NextResponse.json({ ok: false, error: response.error, restart: response.restart }, { status: response.status });
+  }
+
+  return NextResponse.json(response.restart, { status: response.status });
+}
+
+async function readConfirmationPayload(request: Request): Promise<SelfUpdateConfirmationInput> {
+  try {
+    return (await request.json()) as SelfUpdateConfirmationInput;
+  } catch {
+    return {};
+  }
 }
