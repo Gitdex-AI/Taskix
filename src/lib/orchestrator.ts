@@ -3,11 +3,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { CodexClient } from "@/lib/codex";
 import { GitHubClient } from "@/lib/github";
-import { addLabelsWithGh, createIssueWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh } from "@/lib/github-local";
+import { addLabelsWithGh, commentIssueWithGh, commentPullRequestWithGh, createIssueWithGh, createPullRequestWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { expectedDeveloperBaseBranch, expectedDeveloperBranch, isRecoverablePrBase, prRecoveryBranches } from "@/lib/issue-run-policy";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, cancelPendingJobs, createJob, listJobs, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
-import type { IssueRecord, IssueSpec, ProjectRecord, WorkflowRecord } from "@/lib/types";
+import type { DeveloperIssueResult, IssueRecord, IssueSpec, ProjectRecord, QaPrReviewResult, WorkflowRecord } from "@/lib/types";
 
 const execFileAsync = promisify(execFile);
 
@@ -186,6 +186,7 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
   const qaCloseAt = qaResult.passed ? qaFinishedAt : null;
   const appliedLabels = qaResult.passed ? ["taskix:qa-passed"] : ["taskix:qa-failed"];
   const qaStateLabels = ["qa-passed", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:ready-to-merge"];
+  await publishQaResultToGitHub(project.githubRepo, issue, qaPrUrl, qaResult, appliedLabels, qaStateLabels);
   issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !qaStateLabels.includes(label.toLowerCase())), ...appliedLabels])];
   issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !qaStateLabels.includes(label.toLowerCase())), ...appliedLabels])];
 
@@ -393,6 +394,15 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       timeline.push(`Recovered existing PR context for issue ${issue.issueId} via ${recovery.source}; base ${recovery.base ?? "repository default branch"}.`);
     }
   }
+  if (!developerResult.prUrl && developerResult.branch) {
+    try {
+      developerResult.prUrl = await createDeveloperPullRequest(project.githubRepo, issue, workflow, developerResult);
+      timeline.push(`Taskix created PR ${developerResult.prUrl} for issue ${issue.issueId} from branch ${developerResult.branch}.`);
+    } catch (error) {
+      developerResult.summary = `${developerResult.summary}\n\nTaskix server could not create a PR from branch ${developerResult.branch}: ${error instanceof Error ? error.message : String(error)}`;
+      timeline.push(`Taskix server could not create PR for issue ${issue.issueId} from branch ${developerResult.branch}.`);
+    }
+  }
   const previousPrUrl = issue.prUrl ?? null;
   if (previousPrUrl && developerResult.prUrl && previousPrUrl !== developerResult.prUrl && project?.githubRepo) {
     try {
@@ -404,6 +414,14 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
   }
   issue.prUrl = developerResult.prUrl || null;
   issue.branch = developerResult.branch || null;
+  if (developerResult.prUrl) {
+    try {
+      await publishDeveloperPrStateToGitHub(project.githubRepo, issue, developerResult.prUrl);
+      timeline.push(`Taskix updated GitHub labels for issue ${issue.issueId} after developer PR completion.`);
+    } catch (error) {
+      timeline.push(`Taskix could not update GitHub labels for issue ${issue.issueId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   if (workflow.projectId) {
     const finishedAt = new Date().toISOString();
     const closeAt = developerResult.prUrl ? finishedAt : null;
@@ -542,6 +560,82 @@ function deriveQaSessionStatus(labels: string[]): "active" | "blocked" | "done" 
   if (normalizedLabels.includes("taskix:qa-failed")) return "blocked";
   if (normalizedLabels.includes("taskix:need-qa") || normalizedLabels.includes("taskix:qa-running")) return "active";
   return null;
+}
+
+async function createDeveloperPullRequest(repo: string, issue: IssueRecord, workflow: WorkflowRecord, developerResult: DeveloperIssueResult): Promise<string> {
+  const issueNumber = issue.githubIssueNumber ? `#${issue.githubIssueNumber}` : issue.issueId;
+  const body = [
+    `Taskix workflow: ${displayWorkflowCode(workflow)}`,
+    `Issue: ${issueNumber}`,
+    "",
+    "## Summary",
+    developerResult.summary,
+    "",
+    "## Changed Files",
+    developerResult.changedFiles.length ? developerResult.changedFiles.map((file) => `- ${file}`).join("\n") : "- none reported",
+    "",
+    "## Verification",
+    developerResult.testsRun.length ? developerResult.testsRun.map((test) => `- ${test}`).join("\n") : "- none reported",
+    "",
+    issue.githubIssueNumber ? `Closes #${issue.githubIssueNumber}` : ""
+  ].filter(Boolean).join("\n");
+
+  return createPullRequestWithGh({
+    repo,
+    head: developerResult.branch,
+    base: expectedDeveloperBaseBranch(),
+    title: issue.title,
+    body,
+    labels: ["taskix:pr-opened", "taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter(Boolean)
+  });
+}
+
+async function publishDeveloperPrStateToGitHub(repo: string, issue: IssueRecord, prUrl: string): Promise<void> {
+  const labelsToApply = ["taskix:pr-opened", "taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter((label): label is string => Boolean(label));
+  const labelsToClear = ["taskix:dev-running", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:ready-to-merge"];
+  if (issue.githubIssueNumber) {
+    await removeLabelsWithGh(repo, issue.githubIssueNumber, labelsToRemove(issue.labels ?? [], labelsToClear, labelsToApply));
+    await addLabelsWithGh(repo, issue.githubIssueNumber, labelsToApply);
+  }
+  await removeLabelsWithGh(repo, prUrl, labelsToRemove(issue.prLabels ?? [], labelsToClear, labelsToApply));
+  await addLabelsWithGh(repo, prUrl, labelsToApply);
+}
+
+async function publishQaResultToGitHub(
+  repo: string,
+  issue: IssueRecord,
+  prUrl: string,
+  qaResult: QaPrReviewResult,
+  appliedLabels: string[],
+  qaStateLabels: string[]
+): Promise<void> {
+  const body = [
+    `QA ${qaResult.passed ? "passed" : "failed"} for ${issue.githubIssueNumber ? `issue #${issue.githubIssueNumber}` : issue.issueId}.`,
+    "",
+    "## Summary",
+    qaResult.summary,
+    "",
+    "## Findings",
+    qaResult.findings.length ? qaResult.findings.map((finding) => `- ${finding}`).join("\n") : "- none",
+    "",
+    "## Commands",
+    qaResult.testsRun.length ? qaResult.testsRun.map((test) => `- ${test}`).join("\n") : "- none reported"
+  ].join("\n");
+
+  if (issue.githubIssueNumber) {
+    await removeLabelsWithGh(repo, issue.githubIssueNumber, labelsToRemove(issue.labels ?? [], qaStateLabels, appliedLabels));
+    await addLabelsWithGh(repo, issue.githubIssueNumber, appliedLabels);
+    await commentIssueWithGh(repo, issue.githubIssueNumber, body);
+  }
+  await removeLabelsWithGh(repo, prUrl, labelsToRemove(issue.prLabels ?? [], qaStateLabels, appliedLabels));
+  await addLabelsWithGh(repo, prUrl, appliedLabels);
+  await commentPullRequestWithGh(repo, prUrl, body);
+}
+
+function labelsToRemove(existingLabels: string[], candidateLabels: string[], keepLabels: string[]): string[] {
+  const existing = new Set(existingLabels.map((label) => label.toLowerCase()));
+  const keep = new Set(keepLabels.map((label) => label.toLowerCase()));
+  return candidateLabels.filter((label) => existing.has(label.toLowerCase()) && !keep.has(label.toLowerCase()));
 }
 
 async function recoverDeveloperPullRequest(

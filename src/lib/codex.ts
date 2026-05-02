@@ -324,14 +324,14 @@ Task:
 Hard rules:
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated clone for this issue: ${workspaceDir}.
-- Run git fetch, checkout, commit, push, and gh pr create only in the current working directory.
+- Run git fetch, checkout, commit, and push only in the current working directory.
 - Work only inside ownedPaths from the GitHub issue unless an issue comment explicitly revises scope.
 - If Current active PR is not "none", update that PR branch and return the same PR URL. Do not create a replacement PR unless the existing PR is closed or unusable.
-- If Returned from QA is "yes", address QA findings on the current active PR branch, push follow-up commits, and request QA recheck in the PR comments.
+- If Returned from QA is "yes", address QA findings on the current active PR branch and push follow-up commits.
 - If there is no active PR, create a branch named taskix/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.
-- Implement the issue, run relevant tests, commit, push, and open a PR.
-- If implementation is blocked, comment on the issue, add taskix:blocked, and still return JSON with prUrl as an empty string.
-- Add taskix:dev-running when you start. Ensure the active PR is linked to issue #${input.issueNumber} and labeled taskix:pr-opened and taskix:architect-review.
+- Implement the issue, run relevant tests, commit, and push the branch. Do not run gh pr create.
+- Do not add/remove GitHub labels or comments. Taskix server will create/update the PR and labels after you return JSON.
+- If implementation is blocked, return JSON with prUrl as an empty string and explain the blocker in summary.
 
 Return JSON with summary, branch, prUrl, changedFiles, testsRun.`;
     const result = await this.runJsonResult<DeveloperIssueResult>(prompt, schema, { cwd: workspaceDir });
@@ -371,14 +371,15 @@ Task:
 - Decide merge readiness without merging.
 
 Hard rules:
-- If QA is required before merge, add taskix:need-qa to the PR and issue, then return decision "need_qa".
-- If changes are required from developer, comment on the PR, add taskix:blocked, and return decision "changes_requested".
-- If QA is already passed or QA is not needed and the PR is acceptable, add taskix:ready-to-merge and return decision "ready_to_merge".
+- Do not add/remove GitHub labels or comments. Taskix server will apply labels/comments after your structured decision.
+- If QA is required before merge, return decision "need_qa".
+- If changes are required from developer, return decision "changes_requested" and include the required changes in comments.
+- If QA is already passed or QA is not needed and the PR is acceptable, return decision "ready_to_merge".
 - Never merge the PR and never return a merged state during review.
 - If auto deploy is disabled, stop at taskix:ready-to-merge.
 - If auto deploy is enabled and QA has passed, verify repository checks and branch state, then still stop at decision "ready_to_merge" without merging.
 
-Return JSON with decision, summary, labelsApplied, comments.`;
+Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied to an empty array.`;
     const result = await this.runJsonResult<ArchitectPrReviewResult>(prompt, schema);
     return result.value ? { ...result.value, executionLog: result.executionLog } : {
       decision: "blocked",
@@ -468,11 +469,10 @@ Task:
 - Validate the captured PR version against the GitHub issue and comments.
 
 Hard rules:
-- Add taskix:qa-running to the issue and PR when you start.
 - If Expected PR head SHA is captured, verify the PR head still matches it before testing. If it changed, report blocked/stale QA instead of testing a moving target.
-- When passing QA, comment concise verification evidence on the PR, including commands run and any observable labels/state required by acceptance criteria.
-- If passed, add taskix:qa-passed and remove taskix:qa-running.
-- If failed, comment findings on the PR, add taskix:qa-failed, and remove taskix:qa-running.
+- Do not add/remove GitHub labels or comments. Taskix server will publish QA evidence and labels after you return JSON.
+- When passing QA, include concise verification evidence in summary, including commands run and any observable state required by acceptance criteria.
+- When failing QA, include actionable findings and reproduction notes.
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
 - Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.
