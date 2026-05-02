@@ -473,9 +473,11 @@ Task:
 
 Hard rules:
 - If Expected PR head SHA is captured, verify the PR head still matches it before testing. If it changed, report blocked/stale QA instead of testing a moving target.
-- Do not add/remove GitHub labels or comments. Taskix server will publish QA evidence and labels after you return JSON.
+- Do not create/edit GitHub issues, PRs, labels, or comments. Taskix server will publish QA evidence and labels after you return JSON.
+- Enforce ownedPaths, but allow minimal changes to automated test files that directly verify this issue's acceptance criteria, even when the architect omitted those test files from ownedPaths. Do not fail QA for that narrow test-scope exception; mention it in summary if relevant.
 - When passing QA, include concise verification evidence in summary, including commands run and any observable state required by acceptance criteria.
 - When failing QA, include actionable findings and reproduction notes.
+- If a required baseline command fails for a repo-level reason that is clearly unrelated to the PR diff, report it as an environment or repository blocker in findings, but do not mark the PR implementation failed solely for that unrelated baseline failure when the acceptance criteria and PR-scoped automated tests pass.
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
 - Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.
