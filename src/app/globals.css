@@ -211,6 +211,7 @@ pre,
 }
 
 .section-header {
+  padding: 10px 12px !important;
   border-bottom: 1px solid var(--app-border);
 }
 
@@ -297,7 +298,7 @@ pre,
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--app-border);
   background: rgba(255, 255, 255, 0.88);
 }
