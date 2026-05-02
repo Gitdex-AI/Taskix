@@ -322,6 +322,7 @@ Returned from QA: ${input.returnedFromQa ? "yes" : "no"}
 Task:
 - Read issue #${input.issueNumber}, labels, linked PRs, and latest comments with gh. Treat GitHub as the source of truth for requirements, ownedPaths, acceptance criteria, dependencies, and prior QA/architect feedback.
 - Implement or update the active PR according to that GitHub context.
+- If QA/architect comments conflict, follow the newest relevant comment and the current Taskix workflow rules. Treat older conflicting QA findings as superseded by newer QA feedback.
 
 Hard rules:
 - Do not modify the current Taskix app checkout or its .git directory.
@@ -329,6 +330,7 @@ Hard rules:
 - Run git fetch, checkout, commit, and push only in the current working directory.
 - Work only inside ownedPaths from the GitHub issue unless an issue comment explicitly revises scope.
 - You may also update test files that directly verify this issue's acceptance criteria, even if the architect omitted them from ownedPaths. Keep those test edits minimal and explain the test-scope reason in summary.
+- Do not revert a directly related test update merely because an older QA comment called it outside ownedPaths; current Taskix policy allows that narrow test-scope exception.
 - If Current active PR is not "none", update that PR branch and return the same PR URL. Do not create a replacement PR unless the existing PR is closed or unusable.
 - If Returned from QA is "yes", address QA findings on the current active PR branch and push follow-up commits.
 - If there is no active PR, create a branch named taskix/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.
