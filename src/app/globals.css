@@ -258,6 +258,34 @@ pre,
   border-top: 1px solid #fee2e2;
 }
 
+.project-details-panel {
+  margin: 0;
+}
+
+.project-details-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.project-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-details-summary::after {
+  color: #64748b;
+  content: "Show";
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.project-details-panel[open] .project-details-summary::after {
+  content: "Hide";
+}
+
 .project-delete-form {
   margin-top: 8px;
 }

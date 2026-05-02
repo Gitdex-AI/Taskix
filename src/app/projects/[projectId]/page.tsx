@@ -197,26 +197,28 @@ export default async function ProjectDetailPage({
           </Paper>
 
           <Paper mt="md">
-            <Group justify="space-between" p="md" className="section-header">
-              <div>
-                <Text fw={760}>Project</Text>
-                <Text size="sm" c="dimmed">{project.githubRepo}</Text>
-              </div>
-              <Badge variant="light">{project.autoDeploy ? "auto deploy" : "manual deploy"}</Badge>
-            </Group>
-            <Stack p="md" gap="xs">
-              <Text size="sm">Slug: <Code>{project.slug}</Code></Text>
-              <Text size="sm">PM: <Code>{project.projectManagerSessionId ?? "new"}</Code></Text>
-              <Text size="sm">Architect: <Code>{project.architectSessionId ?? "new"}</Code></Text>
-              <Text size="sm">DevOps: <Code>{project.devopsSessionId ?? "new"}</Code></Text>
-              <Text size="sm">Agents: <Code>{project.agentsFilePath}</Code></Text>
-              <Text size="sm">Agents update: <Code>{project.updateAgentsFile ? "enabled" : "skipped"}</Code></Text>
-              <div className="project-danger-zone">
-                <Text size="xs" fw={780} c="red">Delete local project</Text>
-                <Text size="xs" c="dimmed">Type <Code>{project.slug}</Code> to remove this local project and its local Taskix state. GitHub data is not deleted.</Text>
-                <ProjectDeleteForm projectId={project.projectId} slug={project.slug} />
-              </div>
-            </Stack>
+            <details className="project-details-panel">
+              <summary className="section-header project-details-summary">
+                <div>
+                  <Text fw={760}>Project</Text>
+                  <Text size="sm" c="dimmed">{project.githubRepo}</Text>
+                </div>
+                <Badge variant="light">{project.autoDeploy ? "auto deploy" : "manual deploy"}</Badge>
+              </summary>
+              <Stack p="md" gap="xs">
+                <Text size="sm">Slug: <Code>{project.slug}</Code></Text>
+                <Text size="sm">PM: <Code>{project.projectManagerSessionId ?? "new"}</Code></Text>
+                <Text size="sm">Architect: <Code>{project.architectSessionId ?? "new"}</Code></Text>
+                <Text size="sm">DevOps: <Code>{project.devopsSessionId ?? "new"}</Code></Text>
+                <Text size="sm">Agents: <Code>{project.agentsFilePath}</Code></Text>
+                <Text size="sm">Agents update: <Code>{project.updateAgentsFile ? "enabled" : "skipped"}</Code></Text>
+                <div className="project-danger-zone">
+                  <Text size="xs" fw={780} c="red">Delete local project</Text>
+                  <Text size="xs" c="dimmed">Type <Code>{project.slug}</Code> to remove this local project and its local Taskix state. GitHub data is not deleted.</Text>
+                  <ProjectDeleteForm projectId={project.projectId} slug={project.slug} />
+                </div>
+              </Stack>
+            </details>
           </Paper>
         </aside>
       </div>
