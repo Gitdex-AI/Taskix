@@ -351,6 +351,8 @@ Hard rules:
   - "implementation" when you are blocked by a normal implementation or tooling problem that developer can resolve on retry.
   - "spec" when the GitHub issue is unclear, contradictory, missing required architecture decisions, has unsafe acceptance criteria, has insufficient ownedPaths, or cannot be executed without architect clarification. Do not choose the technical policy yourself in this case.
   - "environment" when local workspace/tooling prevents work from starting or completing.
+- Choose "spec" when satisfying one acceptance criterion makes another criterion fail and the issue does not define a trusted signal, policy, dependency, interface, or ownership boundary that distinguishes the cases.
+- Choose "spec" when the latest QA/architect comments show repeated back-and-forth between incompatible fixes under the current issue text. Do not keep guessing a policy by changing code.
 - For blockedType "spec", do not create a PR. Explain the exact issue or architecture clarification needed so Architect can update the GitHub issue.
 
 Return JSON with summary, blockedType, branch, prUrl, changedFiles, testsRun.`;
@@ -503,6 +505,8 @@ Hard rules:
   - "environment" when validation is blocked by local tooling/runtime constraints unrelated to the PR.
   - "stale" when the expected PR head SHA no longer matches.
 - Use "spec" instead of "implementation" when a developer cannot choose the correct fix without changing the issue, security model, ownedPaths, dependency order, or acceptance criteria. In that case, labelsApplied must include "taskix:spec-blocked" and "taskix:blocked", and must not include "taskix:qa-failed".
+- Use "spec" when the PR alternates between passing one requirement and failing another because the issue does not define the trusted signal, policy, dependency, interface, or ownership boundary needed to satisfy both. This is an architecture/specification problem even if a concrete probe can reproduce the current failure.
+- Use "spec" when the issue has already cycled through multiple developer fixes and QA/architect findings show mutually incompatible expectations under the current issue text.
 - Use "implementation" only when the existing issue is executable as written and the developer can fix the PR without architect clarification. In that case, labelsApplied should include "taskix:qa-failed".
 - When failing QA, include actionable findings and reproduction notes. For spec failures, explain the architectural decision that is missing and do not prescribe code changes as if the developer can choose the policy alone.
 - If a required baseline command fails for a repo-level reason that is clearly unrelated to the PR diff, report it as an environment or repository blocker in findings, but do not mark the PR implementation failed solely for that unrelated baseline failure when the acceptance criteria and PR-scoped automated tests pass.
