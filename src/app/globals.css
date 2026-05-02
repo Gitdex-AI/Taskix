@@ -327,7 +327,7 @@ pre,
 
 .chat-composer::before {
   position: absolute;
-  right: 0;
+  right: 18px;
   bottom: 100%;
   left: 0;
   height: 44px;
