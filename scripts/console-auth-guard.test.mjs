@@ -35,8 +35,10 @@ describe("console auth guard", () => {
   it("recognizes the admin session cookie without treating it as verified page auth", () => {
     assert.equal(hasAdminSessionCookie(new Set()), false);
     assert.equal(hasAdminSessionCookie(new Set([adminSessionCookieName])), true);
-    assert.equal(authorizeConsolePageRequest({ authenticated: false }), "login");
-    assert.equal(authorizeConsolePageRequest({ authenticated: true }), "allow");
+    assert.equal(authorizeConsolePageRequest({ initialized: false, authenticated: false }), "setup");
+    assert.equal(authorizeConsolePageRequest({ initialized: true, authenticated: false }), "login");
+    assert.equal(authorizeConsolePageRequest({ initialized: true, authenticated: true }), "allow");
+    assert.equal(authorizeConsolePageRequest({ initialized: false, authenticated: true }), "allow");
   });
 
   it("allows uninitialized and authenticated API requests but rejects initialized anonymous access", () => {
