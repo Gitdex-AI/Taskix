@@ -525,13 +525,13 @@ function renderRequirementRows(projectId: string, workflows: WorkflowRecord[], j
     const status = requirementStatus(workflow, planningJob);
     return (
       <a key={workflow.workflowId} href={`/projects/${projectId}/workflows/${workflow.workflowId}`} className="requirement-row">
-        <Group justify="space-between" align="flex-start" gap="sm" wrap="nowrap">
-          <div style={{ minWidth: 0 }}>
+        <div className="requirement-row-body">
+          <div className="requirement-row-main">
             <Text size="sm" fw={780} lineClamp={1}>Requirement ID: {workflow.trackingCode ?? workflow.workflowId}</Text>
             <Text size="xs" c="dimmed" mt={3} lineClamp={2}>{workflow.userRequirement}</Text>
           </div>
-          <Badge size="xs" variant="light" color={status.color}>{status.label}</Badge>
-        </Group>
+          <Badge className="requirement-status-badge" size="xs" variant="light" color={status.color}>{status.label}</Badge>
+        </div>
       </a>
     );
   });

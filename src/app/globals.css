@@ -610,6 +610,23 @@ pre,
   border-color: #bfdbfe;
 }
 
+.requirement-row-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: 10px;
+}
+
+.requirement-row-main {
+  min-width: 0;
+}
+
+.requirement-status-badge {
+  flex-shrink: 0;
+  max-width: none;
+  white-space: nowrap;
+}
+
 .workflow-step-action {
   padding: 10px 0;
   border-bottom: 1px solid #eef2f7;
