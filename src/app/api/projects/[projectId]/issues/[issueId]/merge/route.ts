@@ -40,16 +40,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
 async function runArchitectMergeRequest(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord): Promise<{ text: string }> {
   const now = new Date().toISOString();
   const content = [
-    `Merge requested for ${issue.issueId}: ${issue.title}`,
+    "You are architect merge owner.",
     "",
-    `Workflow: ${workflow.trackingCode ?? workflow.workflowId}`,
-    `GitHub issue: ${issue.githubIssueNumber ? `#${issue.githubIssueNumber}` : "none"}`,
+    `GitHub repo: ${project.githubRepo}`,
+    `Issue: ${issue.githubIssueNumber ? `#${issue.githubIssueNumber}` : issue.issueId}`,
     `PR: ${issue.prUrl ?? "none"}`,
-    `Issue labels: ${(issue.labels ?? []).join(", ") || "none"}`,
-    `PR labels: ${(issue.prLabels ?? []).join(", ") || "none"}`,
-    `Recorded PR state: ${issue.prState ?? "unknown"}`,
     "",
-    "Handle this as architect now. This PR already passed QA and architect code review. Inspect the current branch state one last time. If it can be merged under the repository workflow, merge it and report the result. If it has conflicts or needs rework, explain the blocker and next action for developer or user follow-up."
+    "Read the issue, PR state, checks, labels, comments, and mergeability with gh. Treat GitHub as the source of truth.",
+    "Only merge if taskix:ready-to-merge is present and no blocker exists.",
+    "If merged, apply taskix:merged and close the issue. If blocked by conflict or checks, comment the blocker and return it to developer."
   ].join("\n");
 
   workflow.timeline.push(`Requested architect merge handling for ${issue.issueId}.`);

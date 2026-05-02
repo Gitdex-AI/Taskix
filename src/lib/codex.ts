@@ -287,7 +287,6 @@ Implementation must stay within owned paths unless the issue explicitly calls ou
     activeBranch?: string | null;
     returnedFromQa?: boolean | null;
   }): Promise<DeveloperIssueResult> {
-    const ownedPaths = input.issue.ownedPaths ?? [];
     const schema = objectSchema({
       summary: { type: "string" },
       branch: { type: "string" },
@@ -312,39 +311,27 @@ Implementation must stay within owned paths unless the issue explicitly calls ou
 
 GitHub repo: ${input.repo}
 GitHub issue: #${input.issueNumber}
-Workflow: ${input.workflowId}
 Workspace: ${workspaceDir}
 Base branch: ${baseBranch ?? "repository default branch"}
 Current active PR: ${input.activePrUrl ?? "none"}
 Current active branch: ${input.activeBranch ?? "none"}
 Returned from QA: ${input.returnedFromQa ? "yes" : "no"}
 
-Developer role: ${input.issue.developerRole ?? "general_developer"}
-Role profile:
-${developerRoleProfile(input.issue.developerRole)}
+Task:
+- Read issue #${input.issueNumber}, labels, linked PRs, and latest comments with gh. Treat GitHub as the source of truth for requirements, ownedPaths, acceptance criteria, dependencies, and prior QA/architect feedback.
+- Implement or update the active PR according to that GitHub context.
 
-Owned paths:
-${ownedPaths.map((item) => `- ${item}`).join("\n")}
-
-Required GitHub label behavior:
-- Add taskix:dev-running to issue #${input.issueNumber} when you start.
-- Create a pull request linked to issue #${input.issueNumber}.
-- Add taskix:pr-opened and taskix:architect-review to the PR.
-- Keep the role label role:${input.issue.developerRole ?? "general_developer"} on the issue/PR.
-
-Execution rules:
-- Use gh to read issue #${input.issueNumber}; treat GitHub as the source of truth.
+Hard rules:
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated clone for this issue: ${workspaceDir}.
-- Start from the checked-out base branch in the current working directory.
 - Run git fetch, checkout, commit, push, and gh pr create only in the current working directory.
-- Work only inside ownedPaths unless the issue explicitly requires an integration point.
+- Work only inside ownedPaths from the GitHub issue unless an issue comment explicitly revises scope.
 - If Current active PR is not "none", update that PR branch and return the same PR URL. Do not create a replacement PR unless the existing PR is closed or unusable.
 - If Returned from QA is "yes", address QA findings on the current active PR branch, push follow-up commits, and request QA recheck in the PR comments.
 - If there is no active PR, create a branch named taskix/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.
-- If this work validates Taskix recovery/ready-to-merge behavior, document observable verification evidence in the PR body, including deterministic recovery, recovered base visibility, ready-to-merge expectations, and no generated PR merge.
 - Implement the issue, run relevant tests, commit, push, and open a PR.
 - If implementation is blocked, comment on the issue, add taskix:blocked, and still return JSON with prUrl as an empty string.
+- Add taskix:dev-running when you start. Ensure the active PR is linked to issue #${input.issueNumber} and labeled taskix:pr-opened and taskix:architect-review.
 
 Return JSON with summary, branch, prUrl, changedFiles, testsRun.`;
     const result = await this.runJsonResult<DeveloperIssueResult>(prompt, schema, { cwd: workspaceDir });
@@ -379,12 +366,15 @@ PR: ${input.prUrl}
 QA passed: ${input.qaPassed ? "yes" : "no/not yet"}
 Auto deploy: ${input.autoDeploy ? "enabled" : "disabled"}
 
-Required GitHub label behavior:
-- Read the linked issue and PR with gh.
+Task:
+- Read the linked issue, PR diff, labels, comments, and QA evidence with gh. Treat GitHub as the source of truth.
+- Decide merge readiness without merging.
+
+Hard rules:
 - If QA is required before merge, add taskix:need-qa to the PR and issue, then return decision "need_qa".
 - If changes are required from developer, comment on the PR, add taskix:blocked, and return decision "changes_requested".
 - If QA is already passed or QA is not needed and the PR is acceptable, add taskix:ready-to-merge and return decision "ready_to_merge".
-- This is a merge-readiness decision, not merge execution. Never merge the PR and never return a merged state.
+- Never merge the PR and never return a merged state during review.
 - If auto deploy is disabled, stop at taskix:ready-to-merge.
 - If auto deploy is enabled and QA has passed, verify repository checks and branch state, then still stop at decision "ready_to_merge" without merging.
 
@@ -417,11 +407,11 @@ Issue: #${input.issueNumber}
 PR: ${input.prUrl}
 Project deployment policy: manual deploy; do not merge.
 
-You are the architect and own final merge-readiness review after QA has passed.
+Task:
+- Read the issue, PR diff, labels, comments, and QA evidence with gh. Treat GitHub as the source of truth.
+- Perform architect code review and merge-readiness review after QA has passed.
 
-Rules:
-- Read the linked issue, PR diff, labels, and QA result with gh.
-- Perform code review before merge. Decide whether the PR is ready to merge, needs changes, or is blocked.
+Hard rules:
 - Do not merge the PR.
 - Preserve manual-deploy handling by stopping at merge readiness only; do not generate merge, deploy, or PR-closing actions.
 - Do not add or remove GitHub labels; Taskix will apply labels after your structured decision.
@@ -473,16 +463,16 @@ PR: ${input.prUrl}
 Expected PR head SHA: ${input.headSha ?? "not captured"}
 Workspace: ${workspaceDir}
 
-Required GitHub label behavior:
+Task:
+- Read the issue, acceptance criteria, ownedPaths, PR diff, labels, and comments with gh. Treat GitHub as the source of truth.
+- Validate the captured PR version against the GitHub issue and comments.
+
+Hard rules:
 - Add taskix:qa-running to the issue and PR when you start.
-- Read the issue acceptance criteria and PR diff using gh.
 - If Expected PR head SHA is captured, verify the PR head still matches it before testing. If it changed, report blocked/stale QA instead of testing a moving target.
-- Validate implementation, ownedPaths, and relevant tests.
 - When passing QA, comment concise verification evidence on the PR, including commands run and any observable labels/state required by acceptance criteria.
 - If passed, add taskix:qa-passed and remove taskix:qa-running.
 - If failed, comment findings on the PR, add taskix:qa-failed, and remove taskix:qa-running.
-
-Execution rules:
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
 - Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.
