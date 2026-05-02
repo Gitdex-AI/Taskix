@@ -438,11 +438,24 @@ Return JSON with decision, summary, labelsApplied, comments. Set labelsApplied t
       labelsApplied: { type: "array", items: { type: "string" } },
       testsRun: { type: "array", items: { type: "string" } }
     });
+    let workspaceDir: string;
+    try {
+      workspaceDir = await this.prepareQaWorkspace(input.repo, input.issueNumber, input.prUrl);
+    } catch (error) {
+      return {
+        passed: false,
+        summary: `QA workspace preparation failed for issue #${input.issueNumber}: ${error instanceof Error ? error.message : String(error)}`,
+        findings: ["QA could not start because its isolated workspace could not be prepared."],
+        labelsApplied: [],
+        testsRun: []
+      };
+    }
     const prompt = `${rolePrompts.qa}
 
 GitHub repo: ${input.repo}
 Issue: #${input.issueNumber}
 PR: ${input.prUrl}
+Workspace: ${workspaceDir}
 
 Required GitHub label behavior:
 - Add taskix:qa-running to the issue and PR when you start.
@@ -452,8 +465,13 @@ Required GitHub label behavior:
 - If passed, add taskix:qa-passed and remove taskix:qa-running.
 - If failed, comment findings on the PR, add taskix:qa-failed, and remove taskix:qa-running.
 
+Execution rules:
+- Do not modify the current Taskix app checkout or its .git directory.
+- The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
+- Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.
+
 Return JSON with passed, summary, findings, labelsApplied, testsRun.`;
-    const result = await this.runJsonResult<QaPrReviewResult>(prompt, schema);
+    const result = await this.runJsonResult<QaPrReviewResult>(prompt, schema, { cwd: workspaceDir });
     return result.value ? { ...result.value, executionLog: result.executionLog } : {
       passed: false,
       summary: `QA runner did not complete PR review for ${input.prUrl}.`,
@@ -677,6 +695,37 @@ Summarize code review outcome, merge readiness, and deployment status according 
     await checkoutWorkspaceBase(workspaceDir);
     return workspaceDir;
   }
+
+  private async prepareQaWorkspace(repo: string, issueNumber: number, prUrl: string): Promise<string> {
+    const workspaceRoot = path.join(dataDir, "taskix-workspaces");
+    await mkdir(workspaceRoot, { recursive: true });
+    const baseDir = path.join(workspaceRoot, sanitizePathSegment(`qa-issue-${issueNumber}`));
+    const workspaceDir = await chooseWorkspaceDir(baseDir);
+
+    if (!existsSync(path.join(workspaceDir, ".git"))) {
+      await mkdir(path.dirname(workspaceDir), { recursive: true });
+      await execFileAsync("gh", ["repo", "clone", repo, workspaceDir]);
+    }
+
+    try {
+      await execFileAsync("git", ["-C", workspaceDir, "fetch", "origin", "--prune"]);
+    } catch {
+      // QA can still inspect the PR through gh even when fetch fails.
+    }
+
+    const prNumber = extractPullRequestNumber(prUrl);
+    if (prNumber) {
+      try {
+        await execFileAsync("gh", ["pr", "checkout", String(prNumber), "--repo", repo], { cwd: workspaceDir });
+        return workspaceDir;
+      } catch {
+        // Fall back to the repository base branch; the QA prompt still requires gh PR inspection.
+      }
+    }
+
+    await checkoutWorkspaceBase(workspaceDir);
+    return workspaceDir;
+  }
 }
 
 function objectSchema(properties: Record<string, unknown>): object {
@@ -709,6 +758,13 @@ async function chooseWorkspaceDir(baseDir: string): Promise<string> {
 
 function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_.-]/g, "-");
+}
+
+function extractPullRequestNumber(prUrl: string): number | null {
+  const match = prUrl.match(/\/pull\/(\d+)(?:\D|$)/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isInteger(value) ? value : null;
 }
 
 async function checkoutWorkspaceBase(workspaceDir: string): Promise<void> {
