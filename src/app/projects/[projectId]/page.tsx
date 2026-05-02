@@ -54,18 +54,19 @@ export default async function ProjectDetailPage({
   const sortedWorkflows = sortWorkflowsLatestFirst(workflows);
   const activeWorkflows = sortedWorkflows.filter((workflow) => workflow.status !== "done");
   const doneWorkflows = sortedWorkflows.filter((workflow) => workflow.status === "done");
+  const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
   const queuedWorkflowId = query.workflow ?? null;
   const queuedJobId = query.job ?? null;
   const queuedWorkflow = queuedWorkflowId ? sortedWorkflows.find((workflow) => workflow.workflowId === queuedWorkflowId) ?? null : null;
   const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
   const latestWorkflow = queuedWorkflow ?? visibleActiveWorkflows[0] ?? sortedWorkflows[0] ?? null;
-  const workflowPanelWorkflows = latestWorkflow ? [latestWorkflow] : [];
+  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !queuedWorkflow && !isInspectingIssueSession);
+  const workflowPanelWorkflows = hasUnqueuedPmHandoff ? [] : latestWorkflow ? [latestWorkflow] : [];
   const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
   const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
   const workflowPanelDynamicSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && !session.archivedAt);
   const workflowPanelArchivedSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "architect" && session.role !== "devops" && session.archivedAt);
-  const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
   const workflowProgress = getWorkflowProgress({ workflows: workflowPanelWorkflows, jobs: workflowPanelJobs });
   const workflowStepDetails = buildWorkflowStepDetails({
     projectId: project.projectId,
