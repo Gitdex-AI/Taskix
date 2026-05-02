@@ -26,7 +26,6 @@ export function ProjectHandoffToQaButton({
         setError(payload.error ?? "QA handoff failed");
         return;
       }
-      if (payload.redirectTo) router.push(payload.redirectTo);
       router.refresh();
     } catch (error) {
       setError(error instanceof Error ? error.message : "QA handoff failed");

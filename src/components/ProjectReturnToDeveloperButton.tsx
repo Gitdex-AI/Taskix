@@ -26,7 +26,6 @@ export function ProjectReturnToDeveloperButton({
         setError(payload.error ?? "Run Dev failed");
         return;
       }
-      if (payload.redirectTo) router.push(payload.redirectTo);
       router.refresh();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Run Dev failed");
