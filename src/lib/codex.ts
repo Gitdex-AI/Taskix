@@ -781,9 +781,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
     await writeFile(schemaPath, JSON.stringify(schema), "utf8");
     const result = await this.runCodex([
       "--skip-git-repo-check",
-      "--sandbox",
-      this.settings.codexSandbox,
-      ...approvalArgs(this.settings.codexApprovalPolicy),
+      ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy),
       "--model",
       this.settings.codexModel,
       "--output-schema",
@@ -804,7 +802,9 @@ Summarize code review outcome, merge readiness, and deployment status according 
   private async runText(prompt: string, sessionId?: string | null, options: RunTextOptions = {}): Promise<CodexTextResult | null> {
     const tmp = await this.tmpDir();
     const outputPath = path.join(tmp, "output.txt");
-    const args = sessionId ? ["resume", "--skip-git-repo-check", "--model", this.settings.codexModel, "-o", outputPath, sessionId, prompt] : ["--skip-git-repo-check", "--sandbox", this.settings.codexSandbox, ...approvalArgs(this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, prompt];
+    const args = sessionId
+      ? ["resume", "--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, sessionId, prompt]
+      : ["--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, prompt];
     const result = await this.runCodex(args, { cwd: options.cwd });
     if (!result.ok) return null;
     try {
@@ -1003,8 +1003,9 @@ function formatCodexExecutionLog(stdout: string, stderr: string): string {
   return sections.join("\n\n");
 }
 
-function approvalArgs(policy: string): string[] {
-  return policy === "never" ? ["--full-auto"] : [];
+function codexPermissionArgs(sandbox: string, approvalPolicy: string): string[] {
+  if (approvalPolicy === "never" && sandbox === "danger-full-access") return ["--dangerously-bypass-approvals-and-sandbox"];
+  return ["--sandbox", sandbox];
 }
 
 async function chooseWorkspaceDir(baseDir: string): Promise<string> {

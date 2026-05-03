@@ -29,9 +29,7 @@ export async function checkCodexStatus(settings: Settings): Promise<CodexStatus>
         [
           "exec",
           "--skip-git-repo-check",
-          "--sandbox",
-          settings.codexSandbox,
-          ...approvalArgs(settings.codexApprovalPolicy),
+          ...codexPermissionArgs(settings.codexSandbox, settings.codexApprovalPolicy),
           "--model",
           settings.codexModel,
           "Reply with exactly: taskix-codex-ok"
@@ -122,6 +120,7 @@ function compactOutput(stdout: string, stderr: string): string {
   return [stdout.trim(), stderr.trim()].filter(Boolean).join("\n").slice(0, 2_000);
 }
 
-function approvalArgs(policy: string): string[] {
-  return policy === "never" ? ["--full-auto"] : [];
+function codexPermissionArgs(sandbox: string, approvalPolicy: string): string[] {
+  if (approvalPolicy === "never" && sandbox === "danger-full-access") return ["--dangerously-bypass-approvals-and-sandbox"];
+  return ["--sandbox", sandbox];
 }
