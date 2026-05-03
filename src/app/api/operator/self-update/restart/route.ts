@@ -1,19 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 import {
   requestConfirmedSelfUpdateRestart,
-  selfUpdateGuard,
   type SelfUpdateConfirmationInput
 } from "@/lib/self-update";
-import { restartTaskixService } from "@/lib/service-management";
+import { restartTaskixService } from "@/lib/taskix-service";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const unauthorized = await requireConsoleApiAuth();
   if (unauthorized) return unauthorized;
-  const guard = selfUpdateGuard(request);
-  if (!guard.ok) {
-    return NextResponse.json({ error: guard.error }, { status: guard.status });
-  }
 
   const response = await requestConfirmedSelfUpdateRestart(await readConfirmationPayload(request), restartTaskixService);
   if (!response.ok || !response.restart) {

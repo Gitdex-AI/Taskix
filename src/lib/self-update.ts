@@ -52,6 +52,14 @@ export type SelfUpdateServiceRestartResponse = SelfUpdateServiceRestartResult & 
   restartRequested: boolean;
 };
 
+export type SelfUpdateConfirmationInput = {
+  confirmed?: boolean | null;
+};
+
+export type SelfUpdateGuardResult =
+  | { ok: true }
+  | { ok: false; status: number; error: string };
+
 type CommandRunner = (command: SelfUpdateCommand, cwd: string) => Promise<SelfUpdateCommandResult>;
 type RequestSource =
   | Headers
@@ -87,7 +95,7 @@ const operatorIntentSecret = randomBytes(32).toString("hex");
 const operatorIntentMaxAgeSeconds = 5 * 60;
 
 export function isSelfUpdateEnabled(env: NodeJS.ProcessEnv = process.env) {
-  return env.TASKIX_ENABLE_SELF_UPDATE === "true";
+  return env.TASKIX_ENABLE_SELF_UPDATE !== "false";
 }
 
 export function isLocalhostAddress(value: string | null | undefined) {
@@ -136,23 +144,8 @@ export function buildSelfUpdateState(
   };
 }
 
-export function selfUpdateGuard(source: RequestSource) {
-  if (!isSelfUpdateEnabled()) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Self-update is disabled. Set TASKIX_ENABLE_SELF_UPDATE=true to enable it."
-    };
-  }
-
-  if (!isLocalhostRequest(source)) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Self-update endpoints only accept localhost requests."
-    };
-  }
-
+export function selfUpdateGuard(source: RequestSource): SelfUpdateGuardResult {
+  void source;
   return { ok: true as const };
 }
 
@@ -216,18 +209,39 @@ export async function runOperatorSelfUpdate(input: { nonce?: string | null; toke
   };
 }
 
-export async function runOperatorSelfUpdateAndRestart(
-  input: { nonce?: string | null; token?: string | null },
-  restartTaskixService: () => Promise<SelfUpdateServiceRestartResult>,
+export async function runConfirmedSelfUpdate(
+  input: SelfUpdateConfirmationInput,
   cwd = process.cwd()
 ) {
-  const update = await runOperatorSelfUpdate(input, cwd);
-  if (!update.ok || !update.result) {
+  const confirmation = validateSelfUpdateConfirmation(input, "Self-update confirmation is required.");
+  if (!confirmation.ok) {
     return {
       ok: false as const,
-      status: update.status,
-      error: update.error,
-      update: update.result,
+      status: confirmation.status,
+      error: confirmation.error,
+      result: null
+    };
+  }
+
+  const result = await runSelfUpdate(cwd);
+  return {
+    ok: result.ok,
+    status: result.ok ? 200 : 500,
+    error: result.ok ? null : `Self-update failed at ${result.failedCommand ?? "unknown command"}.`,
+    result
+  };
+}
+
+export async function requestConfirmedSelfUpdateRestart(
+  input: SelfUpdateConfirmationInput,
+  restartTaskixService: () => Promise<SelfUpdateServiceRestartResult>
+) {
+  const confirmation = validateSelfUpdateConfirmation(input, "Restart confirmation is required.");
+  if (!confirmation.ok) {
+    return {
+      ok: false as const,
+      status: confirmation.status,
+      error: confirmation.error,
       restart: null
     };
   }
@@ -239,7 +253,6 @@ export async function runOperatorSelfUpdateAndRestart(
       ok: false as const,
       status: 409,
       error,
-      update: update.result,
       restart: null
     };
   }
@@ -257,7 +270,6 @@ export async function runOperatorSelfUpdateAndRestart(
       ok: false as const,
       status: restart.status,
       error: restart.error ?? "Taskix service restart failed.",
-      update: update.result,
       restart
     };
   }
@@ -267,7 +279,6 @@ export async function runOperatorSelfUpdateAndRestart(
     ok: true as const,
     status: 200,
     error: null,
-    update: update.result,
     restart
   };
 }
@@ -286,11 +297,6 @@ export function consumeRestartAvailability() {
 }
 
 export function mintSelfUpdateOperatorIntent() {
-  if (!isSelfUpdateEnabled()) {
-    activeOperatorIntent = null;
-    return null;
-  }
-
   const nonce = randomBytes(32).toString("base64url");
   activeOperatorIntent = {
     nonce,
@@ -308,14 +314,6 @@ export function mintSelfUpdateOperatorIntent() {
 }
 
 export function validateSelfUpdateOperatorIntent(input: { nonce?: string | null; token?: string | null }) {
-  if (!isSelfUpdateEnabled()) {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Self-update is disabled. Set TASKIX_ENABLE_SELF_UPDATE=true to enable it."
-    };
-  }
-
   if (!input.nonce || !input.token) {
     return {
       ok: false as const,
@@ -358,6 +356,18 @@ export function validateSelfUpdateOperatorIntent(input: { nonce?: string | null;
   }
 
   activeOperatorIntent = null;
+  return { ok: true as const };
+}
+
+export function validateSelfUpdateConfirmation(input: SelfUpdateConfirmationInput, error: string) {
+  if (input.confirmed !== true) {
+    return {
+      ok: false as const,
+      status: 400,
+      error
+    };
+  }
+
   return { ok: true as const };
 }
 
