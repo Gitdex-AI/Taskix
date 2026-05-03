@@ -370,6 +370,16 @@ function MessageList({
     .sort((left, right) => compareTimelineItems(left.message, right.message) || left.index - right.index)
     .map((item) => item.message);
 
+  const hasLiveMessages = messages.some((message) => message.kind === "message" && (message.status === "running" || message.status === "pending"));
+  const hasLiveJobs = jobs.some((job) => job.status === "running" || job.status === "pending");
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!hasLiveMessages && !hasLiveJobs) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [hasLiveMessages, hasLiveJobs]);
+
   const runningStatus = null;
 
   if (!messages.length && !jobs.some((job) => job.status === "running")) {
