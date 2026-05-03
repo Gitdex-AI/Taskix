@@ -764,6 +764,7 @@ function renderIssueStageAction(input: {
   autoRunState: AutoRunState | null;
 }): ReactNode {
   const autoRunActive = isAutoRunRunningForIssue(input.autoRunState, input.issue);
+  if (isCompletedIssue(input.issue)) return null;
   if (input.activeJob?.status === "pending" && autoRunActive) return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
   if (input.activeJob?.status === "pending") return wrapAutoRunAction(runningLabelForJob(input.activeJob, input.issue), <ProjectRunJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />);
   if (input.activeJob?.status === "running") return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
@@ -793,6 +794,10 @@ function shouldFailedJobReturnToDeveloper(job: JobRecord): boolean {
 
 function isDeveloperBlockedIssue(issue: IssueRecord): boolean {
   return hasAnyLabel(issue, ["taskix:blocked"]) && !hasAnyLabel(issue, ["taskix:spec-blocked"]) && issue.prState !== "MERGED";
+}
+
+function isCompletedIssue(issue: IssueRecord): boolean {
+  return issue.githubState === "CLOSED" || issue.prState === "MERGED" || hasAnyLabel(issue, ["taskix:merged", "taskix:deployed"]);
 }
 
 function canRunDeveloperIssue(issue: IssueRecord, issues: IssueRecord[]): boolean {

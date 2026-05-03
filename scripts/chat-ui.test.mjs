@@ -35,4 +35,10 @@ assert.match(
   "Normal chat composer should keep the default PM target indicator"
 );
 
+assert.match(
+  projectPageSource,
+  /if\s*\(isCompletedIssue\(input\.issue\)\)\s*return\s+null;[\s\S]*if\s*\(!input\.issue\.prUrl\s*&&\s*input\.completedDeveloperJob\)/,
+  "Completed or merged issues should not fall through to the completed-developer-job Run Dev fallback"
+);
+
 console.log("chat UI source verification passed");
