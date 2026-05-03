@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { addLabelsWithGh, getPullRequestHeadShaWithGh, removeLabelsWithGh } from "@/lib/github-local";
-import { qaValidationInstruction } from "@/lib/orchestrator";
 import { allocateQaPreviewPort, qaPreviewUrl } from "@/lib/qa-preview-port";
-import { appendAgentMessages, cancelPendingJobs, createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
+import { cancelPendingJobs, createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 const removeQaTerminalLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:env-blocked", "taskix:ready-to-merge"];
@@ -69,29 +67,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   workflow.timeline.push(`Handed ${issue.issueId} to QA.`);
   await saveWorkflow(workflow);
 
-  const sessionKey = issue.qaSessionId ?? `${issue.issueId}:qa`;
-  const qaInstruction = qaValidationInstruction(issue.prUrl, issue, headSha, previewUrl);
-  const startedAt = new Date().toISOString();
-  await appendAgentMessages({
-    sessionKey,
-    projectId: project.projectId,
-    role: "qa",
-    title: `QA: ${issue.title}`,
-    workflowId: workflow.workflowId,
-    issueId: issue.issueId,
-    ownedPaths: issue.ownedPaths ?? [],
-    status: "active",
-    currentStep: "QA validating PR",
-    startedAt,
-    githubIssueNumber: issue.githubIssueNumber,
-    githubIssueUrl: issue.githubIssueUrl ?? null,
-    prUrl: issue.prUrl,
-    labels: addQaLabels,
-    messages: [
-      { role: "user", content: qaInstruction, createdAt: startedAt }
-    ]
-  });
-
   await cancelPendingJobs({
     projectId: project.projectId,
     workflowId: workflow.workflowId,
@@ -109,19 +84,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
     projectId: project.projectId,
     type: "qa_run",
     payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt, previewPort, previewUrl }
-  });
-  await appendAgentRunPlaceholder({
-    project,
-    workflow,
-    issue,
-    job,
-    sessionKey,
-    role: "qa",
-    title: `QA: ${issue.title}`,
-    label: "QA",
-    currentStep: "QA validating PR",
-    prUrl: issue.prUrl,
-    labels: addQaLabels
   });
 
   return NextResponse.json({ ok: true, jobId: job.jobId, redirectTo: `/projects/${project.projectId}/workflows/${workflow.workflowId}?autorun=1` });

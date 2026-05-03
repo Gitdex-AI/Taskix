@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
-import { architectReviewInstruction } from "@/lib/architect-runner";
-import { appendAgentMessages, createJob, getAgentSession, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
+import { createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ projectId: string; issueId: string }> }) {
@@ -33,30 +31,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   workflow.timeline.push(existingJob ? `Reviewer job already queued for ${issue.issueId}.` : `Reviewer job queued for ${issue.issueId}.`);
   await saveWorkflow(workflow);
 
-  const sessionKey = `${issue.issueId}:reviewer`;
-  const reviewInstruction = architectReviewInstruction(issue);
-  const existingReviewerSession = await getAgentSession(sessionKey);
-  const startedAt = new Date().toISOString();
-  await appendAgentMessages({
-    sessionKey,
-    projectId: project.projectId,
-    role: "reviewer",
-    title: "Reviewer",
-    sessionId: existingReviewerSession?.sessionId ?? null,
-    workflowId: workflow.workflowId,
-    issueId: issue.issueId,
-    githubIssueNumber: issue.githubIssueNumber,
-    githubIssueUrl: issue.githubIssueUrl ?? null,
-    prUrl: issue.prUrl,
-    labels: issue.prLabels ?? issue.labels ?? [],
-    status: "active",
-    currentStep: "review requested",
-    startedAt,
-    messages: [
-      { role: "user", content: reviewInstruction, createdAt: startedAt }
-    ]
-  });
-
   const job = existingJob ?? await createJob({
     projectId: project.projectId,
     type: "architect_review_run",
@@ -65,20 +39,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       issueId: issue.issueId,
       prUrl: issue.prUrl
     }
-  });
-  await appendAgentRunPlaceholder({
-    project,
-    workflow,
-    issue,
-    job,
-    sessionKey,
-    role: "reviewer",
-    title: "Reviewer",
-    label: "Reviewer",
-    sessionId: existingReviewerSession?.sessionId ?? null,
-    currentStep: "review requested",
-    prUrl: issue.prUrl,
-    labels: issue.prLabels ?? issue.labels ?? []
   });
 
   return NextResponse.json({

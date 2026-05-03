@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
-import { architectMergeInstruction } from "@/lib/architect-runner";
-import { appendAgentMessages, createJob, getAgentSession, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
+import { createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ projectId: string; issueId: string }> }) {
@@ -37,30 +35,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   workflow.timeline.push(existingJob ? `Reviewer merge job already queued for ${issue.issueId}.` : `Reviewer merge job queued for ${issue.issueId}.`);
   await saveWorkflow(workflow);
 
-  const sessionKey = `${issue.issueId}:reviewer`;
-  const mergeInstruction = architectMergeInstruction(project, issue);
-  const existingReviewerSession = await getAgentSession(sessionKey);
-  const startedAt = new Date().toISOString();
-  await appendAgentMessages({
-    sessionKey,
-    projectId: project.projectId,
-    role: "reviewer",
-    title: "Reviewer",
-    sessionId: existingReviewerSession?.sessionId ?? null,
-    workflowId: workflow.workflowId,
-    issueId: issue.issueId,
-    githubIssueNumber: issue.githubIssueNumber,
-    githubIssueUrl: issue.githubIssueUrl ?? null,
-    prUrl: issue.prUrl,
-    labels: issue.labels ?? [],
-    status: "active",
-    currentStep: "merge requested",
-    startedAt,
-    messages: [
-      { role: "user", content: mergeInstruction, createdAt: startedAt }
-    ]
-  });
-
   const job = existingJob ?? await createJob({
     projectId: project.projectId,
     type: "merge_run",
@@ -70,20 +44,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       prUrl: issue.prUrl
     }
   });
-  await appendAgentRunPlaceholder({
-    project,
-    workflow,
-    issue,
-    job,
-    sessionKey,
-    role: "reviewer",
-    title: "Reviewer",
-    label: "Reviewer",
-    sessionId: existingReviewerSession?.sessionId ?? null,
-    currentStep: "merge requested",
-    prUrl: issue.prUrl,
-    labels: issue.labels ?? []
-  });
 
   return NextResponse.json({
     ok: true,
@@ -92,6 +52,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
     runStatus: job.status,
     issueId,
     prUrl: issue.prUrl,
-    architectUrl: `/projects/${project.projectId}?session=${encodeURIComponent(sessionKey)}`
+    architectUrl: `/projects/${project.projectId}?session=${encodeURIComponent(`${issue.issueId}:reviewer`)}`
   });
 }
