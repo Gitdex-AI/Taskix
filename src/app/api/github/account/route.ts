@@ -7,9 +7,10 @@ export async function POST(request: Request) {
   const unauthorized = await requireConsoleApiAuth();
   if (unauthorized) return unauthorized;
   const form = await request.formData();
+  const next = safeNextPath(form.get("next"), "/settings");
   const owner = String(form.get("githubUsername") ?? "").trim();
   if (!owner) {
-    return NextResponse.redirect(new URL("/settings?error=GitHub%20owner%20is%20required.", request.url), { status: 303 });
+    return redirectWithMessage(request, next, "error", "GitHub owner is required.");
   }
 
   const settings = await getSettings();
@@ -24,5 +25,16 @@ export async function POST(request: Request) {
   const message = key.created
     ? "GitHub owner saved. SSH key generated. Add the public key to the GitHub user or organization."
     : "GitHub owner saved. Existing SSH key reused.";
-  return NextResponse.redirect(new URL(`/settings?message=${encodeURIComponent(message)}`, request.url), { status: 303 });
+  return redirectWithMessage(request, next, "message", message);
+}
+
+function safeNextPath(value: FormDataEntryValue | null, fallback: string): string {
+  const next = String(value ?? "").trim();
+  return next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+}
+
+function redirectWithMessage(request: Request, path: string, key: "message" | "error", value: string): NextResponse {
+  const next = new URL(path, request.url);
+  next.searchParams.set(key, value);
+  return NextResponse.redirect(next, { status: 303 });
 }

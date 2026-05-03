@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
-import { GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, UserCircle } from "lucide-react";
+import { FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, UserCircle, Wrench } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
 import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueAction";
@@ -21,6 +21,9 @@ import { ProjectRunJobButton } from "@/components/ProjectRunJobButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
+import { ProjectsPanel } from "@/components/ProjectsPanel";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { ToolsPanel } from "@/components/ToolsPanel";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
 import { getAutoRunState } from "@/lib/auto-run-control";
 import { canAutoRunDeveloper } from "@/lib/auto-run-policy";
@@ -47,7 +50,7 @@ export default async function ProjectDetailPage({
   searchParams
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ role?: string; session?: string; error?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string }>;
+  searchParams: Promise<{ role?: string; session?: string; error?: string; message?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string; panel?: string }>;
 }) {
   const [{ projectId }, query] = await Promise.all([params, searchParams]);
   await requireConsolePageAuth(buildProjectNextPath(projectId, query));
@@ -55,6 +58,7 @@ export default async function ProjectDetailPage({
   if (!project) notFound();
 
   const activeRole = query.role === "architect" ? "architect" : query.role === "devops" ? "devops" : "product_manager";
+  const activePanel = normalizeWorkspacePanel(query.panel);
   const activeSessionKey = query.session ?? `${project.projectId}:${activeRole}`;
   const [sessions, workflows, jobs, activeSession, projects, ghUserLogin] = await Promise.all([
     listAgentSessions(project.projectId),
@@ -121,7 +125,7 @@ export default async function ProjectDetailPage({
 
   return (
     <>
-      {query.error && (
+      {query.error && !activePanel && (
         <Alert color="red" icon={<Info size={16} />} mb="md">
           {query.error}
         </Alert>
@@ -144,19 +148,24 @@ export default async function ProjectDetailPage({
           activeWorkflow={latestWorkflow}
           autoRunState={autoRunState}
           autorunEnabled={query.autorun === "1"}
+          activePanel={activePanel}
           switcherProjects={switcherProjects}
           ghUserLogin={ghUserLogin}
         />
 
         <main className="chat-panel">
-          <ProjectChatArea projectId={project.projectId} sessions={chatSessions} jobs={workflowPanelJobs.length ? workflowPanelJobs : jobs} workflows={workflowPanelWorkflows.length ? workflowPanelWorkflows : workflows} activeWorkflowId={latestWorkflow?.workflowId ?? null} inspectedSession={activeSession} readOnly={isInspectingIssueSession} />
+          {activePanel ? (
+            <WorkspacePanelContent panel={activePanel} projectId={project.projectId} message={query.message} error={query.error} />
+          ) : (
+            <ProjectChatArea projectId={project.projectId} sessions={chatSessions} jobs={workflowPanelJobs.length ? workflowPanelJobs : jobs} workflows={workflowPanelWorkflows.length ? workflowPanelWorkflows : workflows} activeWorkflowId={latestWorkflow?.workflowId ?? null} inspectedSession={activeSession} readOnly={isInspectingIssueSession} />
+          )}
         </main>
       </div>
     </>
   );
 }
 
-function buildProjectNextPath(projectId: string, query: { role?: string; session?: string; error?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string }): string {
+function buildProjectNextPath(projectId: string, query: { role?: string; session?: string; error?: string; message?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string; panel?: string }): string {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value) params.set(key, value);
@@ -198,6 +207,23 @@ function findWorkflowPmSession(sessions: AgentSessionRecord[], projectId: string
 }
 
 type WorkflowPhase = "requirements" | "github" | "operations";
+type WorkspacePanel = "projects" | "tools" | "settings";
+
+function normalizeWorkspacePanel(value: string | undefined): WorkspacePanel | null {
+  if (value === "projects" || value === "tools" || value === "settings") return value;
+  return null;
+}
+
+function WorkspacePanelContent({ panel, projectId, message, error }: { panel: WorkspacePanel; projectId: string; message?: string; error?: string }) {
+  const returnTo = `/projects/${projectId}?panel=${panel}`;
+  return (
+    <div className="workspace-panel-content">
+      {panel === "projects" ? <ProjectsPanel message={message} error={error} /> : null}
+      {panel === "tools" ? <ToolsPanel /> : null}
+      {panel === "settings" ? <SettingsPanel message={message} error={error} returnTo={returnTo} toolsHref={`/projects/${projectId}?panel=tools`} /> : null}
+    </div>
+  );
+}
 
 function normalizeSelectedPhase(value: string | undefined, hasUnqueuedPmHandoff: boolean): WorkflowPhase {
   if (value === "requirements" || value === "github" || value === "operations") return value;
@@ -240,6 +266,7 @@ function ProjectWorkspaceSidebar(input: {
   activeWorkflow: WorkflowRecord | null;
   autoRunState: AutoRunState | null;
   autorunEnabled: boolean;
+  activePanel: WorkspacePanel | null;
   switcherProjects: ComponentProps<typeof ProjectSwitcher>["projects"];
   ghUserLogin: string | null;
 }) {
@@ -367,6 +394,28 @@ function ProjectWorkspaceSidebar(input: {
             <ProjectSyncForm projectId={project.projectId} compact />
             <Button
               component="a"
+              href={`/projects/${project.projectId}?panel=projects`}
+              variant={input.activePanel === "projects" ? "light" : "subtle"}
+              size="compact-xs"
+              radius="xl"
+              title="Projects"
+              aria-label="Projects"
+            >
+              <FolderKanban size={16} />
+            </Button>
+            <Button
+              component="a"
+              href={`/projects/${project.projectId}?panel=tools`}
+              variant={input.activePanel === "tools" ? "light" : "subtle"}
+              size="compact-xs"
+              radius="xl"
+              title="Tools"
+              aria-label="Tools"
+            >
+              <Wrench size={16} />
+            </Button>
+            <Button
+              component="a"
               href={`/projects/${project.projectId}/github-triage`}
               variant="subtle"
               size="compact-xs"
@@ -376,7 +425,7 @@ function ProjectWorkspaceSidebar(input: {
             >
               <ListTodo size={16} />
             </Button>
-            <Button component="a" href="/settings" variant="subtle" size="compact-xs" radius="xl" title="Settings" aria-label="Settings">
+            <Button component="a" href={`/projects/${project.projectId}?panel=settings`} variant={input.activePanel === "settings" ? "light" : "subtle"} size="compact-xs" radius="xl" title="Settings" aria-label="Settings">
               <Settings size={16} />
             </Button>
           </Group>

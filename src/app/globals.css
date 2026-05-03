@@ -644,6 +644,11 @@ body.workspace-mode-body .topbar {
   border-radius: 0;
 }
 
+.workspace-panel-content {
+  width: min(1120px, 100%);
+  padding: 24px clamp(18px, 5vw, 72px) 48px;
+}
+
 .chat-scroll {
   flex: 0 0 auto;
   min-height: calc(100vh - 118px);

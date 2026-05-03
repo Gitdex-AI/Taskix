@@ -8,6 +8,7 @@ export async function POST(request: Request) {
   const unauthorized = await requireConsoleApiAuth();
   if (unauthorized) return unauthorized;
   const form = await request.formData();
+  const next = safeNextPath(form.get("next"), "/settings");
   const current = await getSettings();
   const settings: Settings = {
     appBaseUrl: String(form.get("appBaseUrl") ?? "http://localhost:8000").trim(),
@@ -31,11 +32,11 @@ export async function POST(request: Request) {
   await saveSettings(settings);
 
   if (!settings.telegramBotToken) {
-    return NextResponse.redirect(new URL("/settings?error=Missing%20Telegram%20bot%20token.", request.url), { status: 303 });
+    return redirectWithMessage(request, next, "error", "Missing Telegram bot token.");
   }
   const webhookUrl = `${settings.appBaseUrl.replace(/\/$/, "")}/telegram/webhook`;
   await new TelegramClient(settings.telegramBotToken).setWebhook(webhookUrl, settings.telegramWebhookSecret || undefined);
-  return NextResponse.redirect(new URL(`/settings?message=${encodeURIComponent(`Webhook installed: ${webhookUrl}`)}`, request.url), { status: 303 });
+  return redirectWithMessage(request, next, "message", `Webhook installed: ${webhookUrl}`);
 }
 
 export async function GET() {
@@ -47,4 +48,15 @@ export async function GET() {
   }
   const webhookUrl = `${settings.appBaseUrl.replace(/\/$/, "")}/telegram/webhook`;
   return NextResponse.json(await new TelegramClient(settings.telegramBotToken).setWebhook(webhookUrl, settings.telegramWebhookSecret || undefined));
+}
+
+function safeNextPath(value: FormDataEntryValue | null, fallback: string): string {
+  const next = String(value ?? "").trim();
+  return next.startsWith("/") && !next.startsWith("//") ? next : fallback;
+}
+
+function redirectWithMessage(request: Request, path: string, key: "message" | "error", value: string): NextResponse {
+  const next = new URL(path, request.url);
+  next.searchParams.set(key, value);
+  return NextResponse.redirect(next, { status: 303 });
 }
