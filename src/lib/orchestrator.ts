@@ -40,6 +40,36 @@ export async function createWorkflow(requirement: string, chatId: number, projec
   return workflow;
 }
 
+export async function createDraftWorkflow(project: ProjectRecord): Promise<WorkflowRecord> {
+  const createdAt = new Date().toISOString();
+  const workflow: WorkflowRecord = {
+    workflowId: randomUUID().slice(0, 8),
+    trackingCode: null,
+    userRequirement: "Untitled requirement",
+    status: "created",
+    chatId: 0,
+    createdAt,
+    paused: false,
+    pausedAt: null,
+    projectId: project.projectId,
+    projectName: project.name,
+    issues: [],
+    timeline: [`Draft requirement started for project ${project.name}.`]
+  };
+  await saveWorkflow(workflow);
+  return workflow;
+}
+
+export async function confirmWorkflowRequirement(workflow: WorkflowRecord, requirement: string, project?: ProjectRecord | null): Promise<WorkflowRecord> {
+  const trackingCode = workflow.trackingCode ?? await nextWorkflowTrackingCode(new Date().toISOString());
+  workflow.trackingCode = trackingCode;
+  workflow.userRequirement = requirement;
+  workflow.status = "created";
+  workflow.timeline.push(project ? `Requirement ${trackingCode} confirmed for project ${project.name}.` : `Requirement ${trackingCode} confirmed.`);
+  await saveWorkflow(workflow);
+  return workflow;
+}
+
 async function nextWorkflowTrackingCode(createdAt: string): Promise<string> {
   const day = createdAt.slice(0, 10).replace(/-/g, "");
   const prefix = `WF-${day}-`;

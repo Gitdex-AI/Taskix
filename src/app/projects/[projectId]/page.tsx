@@ -71,30 +71,34 @@ export default async function ProjectDetailPage({
     githubAccount,
     githubRepo
   }));
-  const roleSession = activeSession ?? await getAgentSession(`${project.projectId}:${activeRole}`);
   const isInspectingIssueSession = Boolean(query.session);
-  const pmSession = sessions.find((session) => session.sessionKey === `${project.projectId}:product_manager`);
   const allDynamicSessions = sessions.filter((session) => session.role !== "product_manager" && session.role !== "planner" && session.role !== "devops");
   const archivedSessions = allDynamicSessions.filter((session) => session.archivedAt);
   const dynamicSessions = allDynamicSessions.filter((session) => !session.archivedAt);
   const sortedWorkflows = sortWorkflowsLatestFirst(workflows);
   const activeWorkflows = sortedWorkflows.filter((workflow) => workflow.status !== "done");
   const doneWorkflows = sortedWorkflows.filter((workflow) => workflow.status === "done");
-  const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
   const queuedWorkflowId = query.workflow ?? null;
   const queuedJobId = query.job ?? null;
   const queuedWorkflow = queuedWorkflowId ? sortedWorkflows.find((workflow) => workflow.workflowId === queuedWorkflowId) ?? null : null;
   const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
   const latestWorkflow = queuedWorkflow ?? visibleActiveWorkflows[0] ?? sortedWorkflows[0] ?? null;
+  const pmSession = findWorkflowPmSession(sessions, project.projectId, latestWorkflow);
+  const roleSession = activeSession ?? pmSession ?? await getAgentSession(`${project.projectId}:${activeRole}`);
+  const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
+  const confirmablePmPayload = !isInspectingIssueSession && readyForArchitectPayload && (!latestWorkflow || !latestWorkflow.trackingCode)
+    ? readyForArchitectPayload
+    : null;
   const hasMatchingPmHandoffWorkflow = readyForArchitectPayload
-    ? sortedWorkflows.some((workflow) => workflow.userRequirement === formatPmHandoffPayload(readyForArchitectPayload))
+    ? sortedWorkflows.some((workflow) => workflow.workflowId !== latestWorkflow?.workflowId && workflow.userRequirement === formatPmHandoffPayload(readyForArchitectPayload))
     : false;
-  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
+  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !latestWorkflow && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
   const selectedPhase = normalizeSelectedPhase(query.phase, hasUnqueuedPmHandoff);
   const workflowPanelWorkflows = hasUnqueuedPmHandoff ? [] : latestWorkflow ? [latestWorkflow] : [];
   const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
   const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
+  const chatSessions = isInspectingIssueSession ? sessions : workflowPanelSessions;
   const autoRunState = getAutoRunState(project.projectId);
   const workflowPanelDynamicSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "planner" && session.role !== "devops" && !session.archivedAt);
   const workflowPanelArchivedSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "planner" && session.role !== "devops" && session.archivedAt);
@@ -102,7 +106,7 @@ export default async function ProjectDetailPage({
   const workflowStepDetails = buildWorkflowStepDetails({
     projectId: project.projectId,
     isInspectingIssueSession,
-    readyForArchitectPayload,
+    readyForArchitectPayload: confirmablePmPayload,
     pmSession,
     sessions: workflowPanelSessions,
     dynamicSessions: workflowPanelDynamicSessions,
@@ -128,7 +132,7 @@ export default async function ProjectDetailPage({
           project={project}
           selectedPhase={selectedPhase}
           isInspectingIssueSession={isInspectingIssueSession}
-          readyForArchitectPayload={hasUnqueuedPmHandoff ? readyForArchitectPayload : null}
+          readyForArchitectPayload={confirmablePmPayload}
           pmSession={pmSession}
           workflows={workflowPanelWorkflows}
           visibleActiveWorkflows={visibleActiveWorkflows}
@@ -145,7 +149,7 @@ export default async function ProjectDetailPage({
         />
 
         <main className="chat-panel">
-          <ProjectChatArea projectId={project.projectId} sessions={sessions} jobs={jobs} workflows={workflows} inspectedSession={activeSession} readOnly={isInspectingIssueSession} />
+          <ProjectChatArea projectId={project.projectId} sessions={chatSessions} jobs={workflowPanelJobs.length ? workflowPanelJobs : jobs} workflows={workflowPanelWorkflows.length ? workflowPanelWorkflows : workflows} activeWorkflowId={latestWorkflow?.workflowId ?? null} inspectedSession={activeSession} readOnly={isInspectingIssueSession} />
         </main>
       </div>
     </>
@@ -185,6 +189,12 @@ function prioritizeById<T extends { workflowId?: string; jobId?: string }>(items
     if (leftSelected === rightSelected) return 0;
     return leftSelected ? -1 : 1;
   });
+}
+
+function findWorkflowPmSession(sessions: AgentSessionRecord[], projectId: string, workflow: WorkflowRecord | null): AgentSessionRecord | undefined {
+  if (!workflow) return sessions.find((session) => session.sessionKey === `${projectId}:product_manager`);
+  return sessions.find((session) => session.role === "product_manager" && session.workflowId === workflow.workflowId)
+    ?? sessions.find((session) => session.sessionKey === `${projectId}:product_manager`);
 }
 
 type WorkflowPhase = "requirements" | "github" | "operations";
@@ -257,16 +267,17 @@ function ProjectWorkspaceSidebar(input: {
               }}
             />
           </Group>
-          <Button
-            component="a"
-            href={`/projects/${project.projectId}?role=product_manager&phase=requirements`}
-            fullWidth
-            radius="md"
-            leftSection={<Plus size={16} />}
-            mt="sm"
-          >
-            New Requirement
-          </Button>
+          <form method="post" action={`/api/projects/${project.projectId}/requirements/draft`}>
+            <Button
+              type="submit"
+              fullWidth
+              radius="md"
+              leftSection={<Plus size={16} />}
+              mt="sm"
+            >
+              New Requirement
+            </Button>
+          </form>
         </div>
 
         <div className="project-sidebar-section">
@@ -294,6 +305,7 @@ function ProjectWorkspaceSidebar(input: {
                   isInspectingIssueSession={input.isInspectingIssueSession}
                   readyForArchitectPayload={input.readyForArchitectPayload}
                   pmSession={input.pmSession}
+                  activeWorkflow={input.activeWorkflow}
                   workflows={input.visibleActiveWorkflows}
                   requirementWorkflows={input.requirementWorkflows}
                   doneWorkflows={input.doneWorkflows}
@@ -310,6 +322,7 @@ function ProjectWorkspaceSidebar(input: {
                   isInspectingIssueSession={input.isInspectingIssueSession}
                   readyForArchitectPayload={input.readyForArchitectPayload}
                   pmSession={input.pmSession}
+                  activeWorkflow={input.activeWorkflow}
                   workflows={input.workflows}
                   requirementWorkflows={input.requirementWorkflows}
                   doneWorkflows={input.doneWorkflows}
@@ -326,6 +339,7 @@ function ProjectWorkspaceSidebar(input: {
                   isInspectingIssueSession={input.isInspectingIssueSession}
                   readyForArchitectPayload={input.readyForArchitectPayload}
                   pmSession={input.pmSession}
+                  activeWorkflow={input.activeWorkflow}
                   workflows={input.visibleActiveWorkflows}
                   requirementWorkflows={input.requirementWorkflows}
                   doneWorkflows={input.doneWorkflows}
@@ -381,11 +395,11 @@ function renderWorkflowSwitcher(projectId: string, workflows: WorkflowRecord[], 
     return (
       <a
         key={workflow.workflowId}
-        href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
+        href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=${workflow.trackingCode ? "github" : "requirements"}`}
         className={`workflow-switch-row${active ? " active" : ""}`}
       >
         <div className="workflow-switch-main">
-          <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
+          <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? "Draft requirement"}</Text>
           <Text size="xs" c="dimmed" lineClamp={1}>{workflow.userRequirement}</Text>
         </div>
         <Badge size="xs" color={status.color} variant={active ? "filled" : "light"}>{status.label}</Badge>
@@ -400,6 +414,7 @@ function ThreePhaseWorkflowPanel(input: {
   isInspectingIssueSession: boolean;
   readyForArchitectPayload: ProjectHandoffPayload;
   pmSession: AgentSessionRecord | undefined;
+  activeWorkflow: WorkflowRecord | null;
   workflows: WorkflowRecord[];
   requirementWorkflows: WorkflowRecord[];
   doneWorkflows: WorkflowRecord[];
@@ -415,7 +430,7 @@ function ThreePhaseWorkflowPanel(input: {
       <section className="phase-panel">
         <Stack gap="xs">
           <Text size="xs" c="dimmed">PM confirms scope, then planner creates GitHub issues.</Text>
-          {!input.isInspectingIssueSession && input.readyForArchitectPayload ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} /> : null}
+          {!input.isInspectingIssueSession && input.readyForArchitectPayload ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} workflowId={input.activeWorkflow?.workflowId ?? null} /> : null}
           {renderRequirementRows(input.projectId, input.requirementWorkflows, input.jobs)}
         </Stack>
         <Group justify="flex-end" gap="xs" mt="xs">
@@ -482,7 +497,7 @@ function filterSessionsForWorkflows(sessions: AgentSessionRecord[], workflows: W
   if (!workflowIds.size) return sessions.filter((session) => session.role === "product_manager" || session.role === "planner" || session.role === "devops");
 
   return sessions.filter((session) => {
-    if (session.role === "product_manager" || session.role === "planner" || session.role === "devops") return true;
+    if (session.role === "devops") return true;
     if (session.workflowId && workflowIds.has(session.workflowId)) return true;
     if (session.issueId && issueSessionIds.has(session.issueId)) return true;
     return issueSessionIds.has(session.sessionKey);
@@ -705,6 +720,7 @@ function latestWorkflowJob(workflowId: string, jobs: JobRecord[], type: JobRecor
 }
 
 function requirementStatus(workflow: WorkflowRecord, planningJob: JobRecord | null): { label: string; color: string } {
+  if (!workflow.trackingCode) return { label: "Draft", color: "gray" };
   if (planningJob?.status === "running") return { label: "Planning running", color: "blue" };
   if (planningJob?.status === "pending") return { label: "Ready for planning", color: "blue" };
   if (planningJob?.status === "failed") return { label: "Planning failed", color: "red" };

@@ -30,6 +30,7 @@ export function ProjectChatArea({
   sessions,
   jobs,
   workflows,
+  activeWorkflowId,
   inspectedSession,
   readOnly
 }: {
@@ -37,6 +38,7 @@ export function ProjectChatArea({
   sessions: AgentSessionRecord[];
   jobs: JobRecord[];
   workflows: WorkflowRecord[];
+  activeWorkflowId?: string | null;
   inspectedSession: AgentSessionRecord | null;
   readOnly: boolean;
 }) {
@@ -132,7 +134,7 @@ export function ProjectChatArea({
       kind: "message",
       content: target.message,
       createdAt: new Date().toISOString(),
-      sessionKey: `pending:${target.role}`,
+      sessionKey: activeWorkflowId ? `pending:${activeWorkflowId}:${target.role}` : `pending:${target.role}`,
       sourceLabel: `You → ${targetLabel}`,
       sourceRole: target.role,
       session: null
@@ -172,6 +174,7 @@ export function ProjectChatArea({
       {!readOnly && (
         <div className="chat-composer">
           <form ref={formRef} method="post" action={`/api/projects/${projectId}/chat`} className="chat-composer-form" onSubmit={submitMessage}>
+            {activeWorkflowId ? <input type="hidden" name="workflowId" value={activeWorkflowId} /> : null}
             <Textarea
               name="message"
               aria-label="Message project agents"

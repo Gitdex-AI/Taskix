@@ -5,10 +5,11 @@ import { GitBranch, LoaderCircle } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import type { PmHandoffPayload } from "@/lib/pm-handoff";
 
-export function ProjectHandoffForm({ projectId, payload }: { projectId: string; payload: PmHandoffPayload | null }) {
+export function ProjectHandoffForm({ projectId, payload, workflowId }: { projectId: string; payload: PmHandoffPayload | null; workflowId?: string | null }) {
   if (!payload) {
     return (
       <form method="post" action={`/api/projects/${projectId}/handoff`} className="handoff-form">
+        <WorkflowIdInput workflowId={workflowId} />
         <DirectRequirementFields />
       </form>
     );
@@ -16,10 +17,15 @@ export function ProjectHandoffForm({ projectId, payload }: { projectId: string; 
 
   return (
     <form method="post" action={`/api/projects/${projectId}/handoff`} className="handoff-form">
+      <WorkflowIdInput workflowId={workflowId} />
       <input type="hidden" name="payload" value={JSON.stringify(payload)} />
       <HandoffButton payload={payload} />
     </form>
   );
+}
+
+function WorkflowIdInput({ workflowId }: { workflowId?: string | null }) {
+  return workflowId ? <input type="hidden" name="workflowId" value={workflowId} /> : null;
 }
 
 function DirectRequirementFields() {

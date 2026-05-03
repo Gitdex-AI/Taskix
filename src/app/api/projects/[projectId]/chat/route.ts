@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { CodexClient } from "@/lib/codex";
 import { chatRoleLabel, parseChatTarget } from "@/lib/chat-routing";
+import { createDraftWorkflow } from "@/lib/orchestrator";
 import { getSettings } from "@/lib/settings";
-import { appendAgentMessages, getAgentSession, getProject, saveProject } from "@/lib/store";
+import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveProject } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 export async function POST(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
@@ -11,6 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   const { projectId } = await params;
   const form = await request.formData();
   const rawMessage = String(form.get("message") ?? "").trim();
+  const submittedWorkflowId = String(form.get("workflowId") ?? "").trim();
   const target = parseChatTarget(rawMessage);
   if (!target.message) return redirect(request, `/projects/${projectId}?error=${encodeURIComponent("Message is required.")}`);
   if (target.mention && target.message === rawMessage) {
@@ -22,10 +24,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
 
   const role = target.role;
   const message = target.message;
-  const sessionKey = `${project.projectId}:${role}`;
+  const submittedWorkflow = role === "product_manager" && submittedWorkflowId ? await getWorkflow(submittedWorkflowId) : null;
+  const workflow = role === "product_manager"
+    ? submittedWorkflow?.projectId === project.projectId
+      ? submittedWorkflow
+      : await createDraftWorkflow(project)
+    : null;
+  const workflowId = workflow?.workflowId ?? null;
+  const sessionKey = role === "product_manager" && workflowId
+    ? `${project.projectId}:workflow:${workflowId}:product_manager`
+    : `${project.projectId}:${role}`;
   const existing = await getAgentSession(sessionKey);
   const codex = new CodexClient(settings);
-  const currentSessionId = role === "product_manager" ? project.projectManagerSessionId : role === "architect" ? project.architectSessionId : project.devopsSessionId;
+  const currentSessionId = role === "product_manager" && workflowId
+    ? existing?.sessionId ?? null
+    : role === "product_manager"
+      ? project.projectManagerSessionId
+      : role === "architect"
+        ? project.architectSessionId
+        : project.devopsSessionId;
   const codexStartedAt = Date.now();
   const result = role === "product_manager"
     ? await codex.projectManagerChat({ projectName: project.name, githubRepo: project.githubRepo, message, sessionId: currentSessionId ?? existing?.sessionId })
@@ -34,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
       : await codex.devopsChat({ projectName: project.name, githubRepo: project.githubRepo, message, sessionId: currentSessionId ?? existing?.sessionId });
   const codexDurationMs = Math.max(0, Date.now() - codexStartedAt);
 
-  if (role === "product_manager" && result.sessionId && result.sessionId !== project.projectManagerSessionId) {
+  if (role === "product_manager" && !workflowId && result.sessionId && result.sessionId !== project.projectManagerSessionId) {
     project.projectManagerSessionId = result.sessionId;
     await saveProject(project);
   }
@@ -54,6 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     role,
     title: chatRoleLabel(role),
     sessionId: result.sessionId ?? currentSessionId ?? existing?.sessionId ?? null,
+    workflowId,
     executionLogs: result.executionLog ? [{
       title: `${chatRoleLabel(role)} Codex execution`,
       content: result.executionLog,
@@ -67,7 +85,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     ]
   });
 
-  return redirect(request, `/projects/${project.projectId}`);
+  const next = new URL(`/projects/${project.projectId}`, request.url);
+  if (workflowId) {
+    next.searchParams.set("workflow", workflowId);
+    next.searchParams.set("phase", "requirements");
+  }
+  return NextResponse.redirect(next, { status: 303 });
 }
 
 function redirect(request: Request, location: string): NextResponse {
