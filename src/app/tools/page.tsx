@@ -3,8 +3,10 @@ import { CheckCircle2, FolderGit2, GitBranch, PlayCircle, Terminal } from "lucid
 import { PageTitle } from "@/components/PageTitle";
 import { CodexStatusPanel } from "@/components/CodexStatusPanel";
 import { GhStatusPanel } from "@/components/GhStatusPanel";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 
-export default function ToolsPage() {
+export default async function ToolsPage() {
+  await requireConsolePageAuth("/tools");
   return (
     <>
       <PageTitle title="Tools" />

@@ -46,14 +46,48 @@ export function authorizeConsolePageRequest({ initialized, authenticated }: { in
   return initialized ? "login" : "setup";
 }
 
+export function getConsolePageAuthRedirect({
+  initialized,
+  authenticated,
+  nextPath
+}: {
+  initialized: boolean;
+  authenticated: boolean;
+  nextPath?: string;
+}): string | null {
+  const authorization = authorizeConsolePageRequest({ initialized, authenticated });
+  if (authorization === "allow") return null;
+  if (authorization === "setup") return "/setup";
+  return nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login";
+}
+
+export async function requireConsolePageAuth(nextPath?: string): Promise<void> {
+  const { getAdminSessionFromCookies } = await import("@/lib/session-auth");
+  const session = await getAdminSessionFromCookies();
+  const initialized = session.authenticated ? true : await getAdminInitialized();
+  const redirectTo = getConsolePageAuthRedirect({
+    initialized,
+    authenticated: session.authenticated,
+    nextPath
+  });
+  if (!redirectTo) return;
+
+  const { redirect } = await import("next/navigation");
+  redirect(redirectTo);
+}
+
 export async function requireConsoleApiAuth(pathname = ""): Promise<Response | null> {
   if (pathname && isPublicConsoleApiPath(pathname)) return null;
-  const { isAdminInitialized } = await import("@/lib/admin-auth");
-  if (!(await isAdminInitialized())) return null;
+  if (!(await getAdminInitialized())) return null;
 
   const { getAdminSessionFromCookies } = await import("@/lib/session-auth");
   const session = await getAdminSessionFromCookies();
   return authorizeConsoleApiRequest({ initialized: true, authenticated: session.authenticated });
+}
+
+async function getAdminInitialized(): Promise<boolean> {
+  const { isAdminInitialized } = await import("@/lib/admin-auth");
+  return isAdminInitialized();
 }
 
 function normalizePath(pathname: string): string {

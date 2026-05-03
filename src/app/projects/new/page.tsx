@@ -1,11 +1,14 @@
 import { Alert, Badge, Button, Checkbox, Group, NativeSelect, Paper, SimpleGrid, Text, TextInput, ThemeIcon } from "@mantine/core";
 import { ArrowLeft, FolderPlus, GitBranch, Info, Settings, ShieldCheck } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { listLocalGitHubRepos } from "@/lib/github-local";
 import { getSettings } from "@/lib/settings";
 
 export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const [{ error }, settings] = await Promise.all([searchParams, getSettings()]);
+  const { error } = await searchParams;
+  await requireConsolePageAuth(error ? `/projects/new?error=${encodeURIComponent(error)}` : "/projects/new");
+  const settings = await getSettings();
   const repos = settings.githubUsername ? await safeListRepos(settings.githubUsername) : [];
   const hasGitHubAccount = Boolean(settings.githubUsername && settings.githubSshPublicKey);
 

@@ -6,6 +6,7 @@ const {
   adminSessionCookieName,
   authorizeConsoleApiRequest,
   authorizeConsolePageRequest,
+  getConsolePageAuthRedirect,
   hasAdminSessionCookie,
   isConsoleApiPath,
   isConsolePagePath,
@@ -40,6 +41,9 @@ describe("console auth guard", () => {
     assert.equal(authorizeConsolePageRequest({ initialized: true, authenticated: false }), "login");
     assert.equal(authorizeConsolePageRequest({ initialized: true, authenticated: true }), "allow");
     assert.equal(authorizeConsolePageRequest({ initialized: false, authenticated: true }), "allow");
+    assert.equal(getConsolePageAuthRedirect({ initialized: false, authenticated: false, nextPath: "/projects" }), "/setup");
+    assert.equal(getConsolePageAuthRedirect({ initialized: true, authenticated: false, nextPath: "/projects?filter=active" }), "/login?next=%2Fprojects%3Ffilter%3Dactive");
+    assert.equal(getConsolePageAuthRedirect({ initialized: true, authenticated: true, nextPath: "/projects" }), null);
   });
 
   it("allows uninitialized and authenticated API requests but rejects initialized anonymous access", () => {

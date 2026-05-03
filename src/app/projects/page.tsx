@@ -2,10 +2,13 @@ import { Alert, Button, Group, Paper, Text } from "@mantine/core";
 import { FolderPlus, Info } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
 import { ProjectsTable } from "@/components/Tables";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { listProjects, listWorkflows } from "@/lib/store";
 
 export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ message?: string; error?: string }> }) {
-  const [{ message, error }, projects, workflows] = await Promise.all([searchParams, listProjects(), listWorkflows()]);
+  const { message, error } = await searchParams;
+  await requireConsolePageAuth(buildProjectsNextPath({ message, error }));
+  const [projects, workflows] = await Promise.all([listProjects(), listWorkflows()]);
   const latestWorkflowByProject = new Map<string, string>();
   for (const workflow of workflows) {
     if (!workflow.projectId) continue;
@@ -43,4 +46,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       </Paper>
     </>
   );
+}
+
+function buildProjectsNextPath({ message, error }: { message?: string; error?: string }): string {
+  const params = new URLSearchParams();
+  if (message) params.set("message", message);
+  if (error) params.set("error", error);
+  const query = params.toString();
+  return query ? `/projects?${query}` : "/projects";
 }

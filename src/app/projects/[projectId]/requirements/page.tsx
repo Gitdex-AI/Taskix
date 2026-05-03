@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Badge, Button, Code, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getProject, listProjectWorkflows } from "@/lib/store";
 import type { WorkflowRecord } from "@/lib/types";
 
@@ -10,6 +11,7 @@ export default async function ProjectRequirementsPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  await requireConsolePageAuth(`/projects/${projectId}/requirements`);
   const project = await getProject(projectId);
   if (!project) notFound();
 

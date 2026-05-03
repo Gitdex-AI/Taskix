@@ -23,6 +23,7 @@ import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
 import { getAutoRunState } from "@/lib/auto-run-control";
 import { canAutoRunDeveloper } from "@/lib/auto-run-policy";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { findReadyForArchitectPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
 import { findDependencyIssue, isDependencySatisfied } from "@/lib/issue-dependencies";
 import { getIssueQaStatus } from "@/lib/qa-status";
@@ -46,6 +47,7 @@ export default async function ProjectDetailPage({
   searchParams: Promise<{ role?: string; session?: string; error?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string }>;
 }) {
   const [{ projectId }, query] = await Promise.all([params, searchParams]);
+  await requireConsolePageAuth(buildProjectNextPath(projectId, query));
   const project = await getProject(projectId);
   if (!project) notFound();
 
@@ -233,6 +235,15 @@ export default async function ProjectDetailPage({
       </div>
     </>
   );
+}
+
+function buildProjectNextPath(projectId: string, query: { role?: string; session?: string; error?: string; autorun?: string; workflow?: string; job?: string; queued?: string; phase?: string }): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value) params.set(key, value);
+  }
+  const search = params.toString();
+  return search ? `/projects/${projectId}?${search}` : `/projects/${projectId}`;
 }
 
 function sortWorkflowsLatestFirst(workflows: WorkflowRecord[]): WorkflowRecord[] {

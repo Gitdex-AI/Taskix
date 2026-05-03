@@ -6,6 +6,7 @@ import { ProjectRetryJobButton } from "@/components/ProjectRetryJobButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
 import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getIssueQaStatus } from "@/lib/qa-status";
 import { getProject, getWorkflow, listAgentSessions, listJobs } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord } from "@/lib/types";
@@ -18,6 +19,7 @@ export default async function WorkflowDetailPage({
   searchParams: Promise<{ autorun?: string }>;
 }) {
   const [{ projectId, workflowId }, query] = await Promise.all([params, searchParams]);
+  await requireConsolePageAuth(query.autorun ? `/projects/${projectId}/workflows/${workflowId}?autorun=${encodeURIComponent(query.autorun)}` : `/projects/${projectId}/workflows/${workflowId}`);
   const [project, workflow] = await Promise.all([getProject(projectId), getWorkflow(workflowId)]);
   if (!project || !workflow || workflow.projectId !== project.projectId) notFound();
 
