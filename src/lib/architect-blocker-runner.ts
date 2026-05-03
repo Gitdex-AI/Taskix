@@ -1,6 +1,8 @@
 import { CodexClient } from "@/lib/codex";
+import { agentJobMessageId } from "@/lib/agent-run-messages";
 import { developerRoleIds } from "@/lib/developer-roles";
 import { addLabelsWithGh, commentIssueWithGh, removeLabelsWithGh, updateIssueWithGh } from "@/lib/github-local";
+import { getActiveJobId } from "@/lib/job-runtime";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, createJob, getAgentSession, getWorkflow, listJobs, saveAgentSession, saveProject, saveWorkflow } from "@/lib/store";
 import type { DeveloperRoleId } from "@/lib/developer-roles";
@@ -97,6 +99,7 @@ export async function runArchitectBlockerResolution(project: ProjectRecord, sess
   const durationMs = Math.max(0, new Date(finishedAt).getTime() - new Date(startedAt).getTime());
   const resolutionText = formatResolutionText(result.resolution);
   const executionLog = result.resolution.executionLog;
+  const activeJobId = getActiveJobId();
   const executionLogs = executionLog ? [{
     title: "Architect blocker resolution",
     content: executionLog,
@@ -120,10 +123,20 @@ export async function runArchitectBlockerResolution(project: ProjectRecord, sess
     currentStep: result.resolution.action === "retry_developer" ? "blocker resolved" : "blocker reviewed",
     finishedAt,
     durationMs,
-    executionLogs,
+    executionLogs: [],
     messages: [
       ...(existingArchitectSession?.messages.some((message) => message.content === content) ? [] : [{ role: "user" as const, content, createdAt: startedAt }]),
-      { role: "assistant", content: resolutionText, createdAt: finishedAt }
+      {
+        messageId: activeJobId ? agentJobMessageId(activeJobId) : undefined,
+        jobId: activeJobId,
+        role: "assistant",
+        status: result.resolution.action === "mark_blocked" ? "blocked" : "done",
+        durationMs,
+        executionLogs,
+        content: resolutionText,
+        createdAt: finishedAt,
+        updatedAt: finishedAt
+      }
     ]
   });
 

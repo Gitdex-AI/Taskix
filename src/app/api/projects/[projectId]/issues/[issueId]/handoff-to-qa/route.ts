@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { addLabelsWithGh, getPullRequestHeadShaWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { qaValidationInstruction } from "@/lib/orchestrator";
 import { appendAgentMessages, cancelPendingJobs, createJob, getAgentSession, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
@@ -107,6 +108,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
     projectId: project.projectId,
     type: "qa_run",
     payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt }
+  });
+  await appendAgentRunPlaceholder({
+    project,
+    workflow,
+    issue,
+    job,
+    sessionKey,
+    role: "qa",
+    title: `QA: ${issue.title}`,
+    label: "QA",
+    currentStep: "QA validating PR",
+    prUrl: issue.prUrl,
+    labels: addQaLabels
   });
 
   return NextResponse.json({ ok: true, jobId: job.jobId, redirectTo: `/projects/${project.projectId}/workflows/${workflow.workflowId}?autorun=1` });

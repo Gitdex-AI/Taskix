@@ -409,12 +409,29 @@ export async function appendAgentMessages(input: {
     lastSyncedAt: input.lastSyncedAt ?? existing?.lastSyncedAt ?? null,
     closedAt: input.closedAt ?? (resetLifecycle ? null : existing?.closedAt ?? null),
     archivedAt: input.archivedAt ?? (resetLifecycle ? null : existing?.archivedAt ?? null),
-    messages: [...(existing?.messages ?? []), ...input.messages],
+    messages: mergeAgentMessages(existing?.messages ?? [], input.messages),
     executionLogs: [...(existing?.executionLogs ?? []), ...(input.executionLogs ?? [])],
     updatedAt: now
   };
   await saveAgentSession(session);
   return session;
+}
+
+function mergeAgentMessages(existing: AgentSessionRecord["messages"], incoming: AgentSessionRecord["messages"]): AgentSessionRecord["messages"] {
+  const messages = [...existing];
+  for (const message of incoming) {
+    const index = message.messageId ? messages.findIndex((item) => item.messageId === message.messageId) : -1;
+    if (index === -1) {
+      messages.push(message);
+    } else {
+      messages[index] = {
+        ...messages[index],
+        ...message,
+        executionLogs: message.executionLogs ?? messages[index].executionLogs
+      };
+    }
+  }
+  return messages;
 }
 
 async function uniqueSlug(name: string): Promise<string> {

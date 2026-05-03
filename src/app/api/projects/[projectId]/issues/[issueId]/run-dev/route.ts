@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { developerIssueInstruction } from "@/lib/orchestrator";
 import { appendAgentMessages, createJob, getAgentSession, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
@@ -66,6 +67,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       returnedFromQa: false,
       previousPrUrl: issue.prUrl ?? null
     }
+  });
+  await appendAgentRunPlaceholder({
+    project,
+    workflow,
+    issue,
+    job,
+    sessionKey,
+    role: "developer",
+    title: `${issue.developerRole ?? "general_developer"}: ${issue.title}`,
+    label: issue.developerRole ?? "Dev",
+    developerRole: issue.developerRole ?? "general_developer",
+    currentStep: "developer handling GitHub issue",
+    labels: ["taskix:dev-running"]
   });
 
   return NextResponse.json({

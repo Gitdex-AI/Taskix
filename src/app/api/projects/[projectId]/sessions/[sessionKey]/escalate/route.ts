@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { architectBlockerInstruction } from "@/lib/architect-blocker-runner";
 import { appendAgentMessages, createJob, getAgentSession, getProject, listJobs } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
@@ -54,6 +55,28 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       issueId: session.issueId,
       sessionKey: session.sessionKey
     }
+  });
+  await appendAgentRunPlaceholder({
+    project,
+    job,
+    sessionKey: architectSessionKey,
+    role: "architect",
+    title: "Architect",
+    label: "Architect",
+    sessionId: project.architectSessionId ?? existingArchitectSession?.sessionId ?? null,
+    currentStep: "resolving blocker",
+    workflow: session.workflowId ? { workflowId: session.workflowId } : null,
+    issue: session.issueId ? {
+      issueId: session.issueId,
+      githubIssueNumber: session.githubIssueNumber ?? null,
+      githubIssueUrl: session.githubIssueUrl ?? null,
+      prUrl: session.prUrl ?? null,
+      ownedPaths: session.ownedPaths ?? []
+    } : null,
+    githubIssueNumber: session.githubIssueNumber ?? null,
+    githubIssueUrl: session.githubIssueUrl ?? null,
+    prUrl: session.prUrl ?? null,
+    labels: session.labels ?? []
   });
   requestAutoRunPause(project.projectId, "Auto Run pause requested because a blocked issue was manually sent to Architect.");
 

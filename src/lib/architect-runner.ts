@@ -1,5 +1,7 @@
 import { CodexClient } from "@/lib/codex";
+import { agentJobMessageId } from "@/lib/agent-run-messages";
 import { addLabelsWithGh, commentIssueWithGh, removeLabelsWithGh } from "@/lib/github-local";
+import { getActiveJobId } from "@/lib/job-runtime";
 import { syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveProject, saveWorkflow } from "@/lib/store";
@@ -72,6 +74,7 @@ export async function runWorkflowArchitectReview(workflowId: string, issueId: st
   workflow.status = passed ? "in_progress" : "blocked";
   workflow.timeline.push(passed ? `Architect code review passed for ${issue.issueId}. Ready for merge.` : `Architect code review blocked ${issue.issueId}: ${review.summary}`);
   await saveWorkflow(workflow);
+  const activeJobId = getActiveJobId();
 
   await appendAgentMessages({
     sessionKey: `${project.projectId}:architect`,
@@ -86,15 +89,25 @@ export async function runWorkflowArchitectReview(workflowId: string, issueId: st
     labels: issue.prLabels,
     currentStep: passed ? "code review passed" : "code review blocked",
     status: passed ? "done" : "blocked",
-    executionLogs: review.executionLog ? [{
-      title: `Architect code review for ${issue.title}`,
-      content: review.executionLog,
-      createdAt: now,
-      status: passed ? "ok" : "failed",
-      durationMs: reviewDurationMs
-    }] : [],
+    executionLogs: [],
     messages: [
-      { role: "assistant", content: `Decision: ${review.decision}\n${review.summary}`, createdAt: now }
+      {
+        messageId: activeJobId ? agentJobMessageId(activeJobId) : undefined,
+        jobId: activeJobId,
+        role: "assistant",
+        status: passed ? "done" : "blocked",
+        durationMs: reviewDurationMs,
+        executionLogs: review.executionLog ? [{
+          title: `Architect code review for ${issue.title}`,
+          content: review.executionLog,
+          createdAt: now,
+          status: passed ? "ok" : "failed",
+          durationMs: reviewDurationMs
+        }] : [],
+        content: `Decision: ${review.decision}\n${review.summary}`,
+        createdAt: now,
+        updatedAt: now
+      }
     ]
   });
 
@@ -164,6 +177,8 @@ async function runArchitectMergeRequest(project: ProjectRecord, workflow: Workfl
     project.architectSessionId = result.sessionId;
     await saveProject(project);
   }
+  const activeJobId = getActiveJobId();
+  const finishedAt = new Date().toISOString();
 
   await appendAgentMessages({
     sessionKey,
@@ -176,15 +191,25 @@ async function runArchitectMergeRequest(project: ProjectRecord, workflow: Workfl
     prUrl: issue.prUrl ?? null,
     labels: issue.labels ?? [],
     currentStep: "merge requested",
-    executionLogs: result.executionLog ? [{
-      title: "Architect merge handling",
-      content: result.executionLog,
-      createdAt: new Date().toISOString(),
-      status: "ok",
-      durationMs: mergeDurationMs
-    }] : [],
+    executionLogs: [],
     messages: [
-      { role: "assistant", content: result.text, createdAt: new Date().toISOString() }
+      {
+        messageId: activeJobId ? agentJobMessageId(activeJobId) : undefined,
+        jobId: activeJobId,
+        role: "assistant",
+        status: "done",
+        durationMs: mergeDurationMs,
+        executionLogs: result.executionLog ? [{
+          title: "Architect merge handling",
+          content: result.executionLog,
+          createdAt: finishedAt,
+          status: "ok",
+          durationMs: mergeDurationMs
+        }] : [],
+        content: result.text,
+        createdAt: finishedAt,
+        updatedAt: finishedAt
+      }
     ]
   });
 }

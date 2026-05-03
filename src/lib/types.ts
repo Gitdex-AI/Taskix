@@ -176,6 +176,12 @@ export type AgentMessage = {
   role: AgentMessageRole;
   content: string;
   createdAt: string;
+  messageId?: string;
+  jobId?: string | null;
+  status?: "pending" | "running" | "done" | "blocked" | "failed" | "cancelled";
+  updatedAt?: string | null;
+  durationMs?: number | null;
+  executionLogs?: AgentExecutionLog[];
 };
 
 export type AgentExecutionLog = {

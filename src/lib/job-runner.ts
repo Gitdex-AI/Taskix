@@ -1,9 +1,10 @@
 import { runWorkflowArchitectReview, runWorkflowMerge } from "@/lib/architect-runner";
 import { runArchitectBlockerResolution } from "@/lib/architect-blocker-runner";
+import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { runWorkflow, runWorkflowIssue, runWorkflowQa, syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { runWithJobRuntime } from "@/lib/job-runtime";
-import { claimNextPendingJob, claimPendingJob, getJob, getProject, getWorkflow, saveJob } from "@/lib/store";
-import type { JobRecord } from "@/lib/types";
+import { claimNextPendingJob, claimPendingJob, getAgentSession, getJob, getProject, getWorkflow, saveJob } from "@/lib/store";
+import type { IssueRecord, JobRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
 import { getSettings } from "@/lib/settings";
 import { cleanupInactiveWorktrees } from "@/lib/worktree-manager";
 
@@ -49,6 +50,7 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
         skipped = true;
         return;
       }
+      if (project && workflow) await ensureRunningPlaceholder(project, workflow, job);
       if (job.type === "architect_blocker_run" && project && job.payload.sessionKey) {
         await runArchitectBlockerResolution(project, job.payload.sessionKey);
       } else if (job.type === "issue_run" && job.payload.issueId) {
@@ -83,6 +85,88 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
   await saveJob(job);
   await cleanupCompletedWorktreesIfEnabled();
   return { job, ran: !skipped };
+}
+
+async function ensureRunningPlaceholder(project: ProjectRecord, workflow: WorkflowRecord, job: JobRecord): Promise<void> {
+  const issue = job.payload.issueId ? workflow.issues.find((item) => item.issueId === job.payload.issueId) ?? null : null;
+  if (job.type === "issue_run" && issue) {
+    await appendAgentRunPlaceholder({
+      project,
+      workflow,
+      issue,
+      job,
+      sessionKey: issue.developerSessionId ?? `${issue.issueId}:developer`,
+      role: "developer",
+      title: `${issue.developerRole ?? "general_developer"}: ${issue.title}`,
+      label: issue.developerRole ?? "Dev",
+      developerRole: issue.developerRole ?? "general_developer",
+      currentStep: "developer handling GitHub issue",
+      labels: ["taskix:dev-running"]
+    });
+    return;
+  }
+  if (job.type === "qa_run" && issue) {
+    await appendAgentRunPlaceholder({
+      project,
+      workflow,
+      issue,
+      job,
+      sessionKey: issue.qaSessionId ?? `${issue.issueId}:qa`,
+      role: "qa",
+      title: `QA: ${issue.title}`,
+      label: "QA",
+      currentStep: "QA validating PR",
+      prUrl: job.payload.prUrl ?? issue.prUrl ?? null,
+      labels: ["taskix:need-qa", "taskix:qa-running"]
+    });
+    return;
+  }
+  if ((job.type === "architect_review_run" || job.type === "merge_run") && issue) {
+    const sessionKey = `${project.projectId}:architect`;
+    const existing = await getAgentSession(sessionKey);
+    await appendAgentRunPlaceholder({
+      project,
+      workflow,
+      issue,
+      job,
+      sessionKey,
+      role: "architect",
+      title: "Architect",
+      label: "Architect",
+      sessionId: project.architectSessionId ?? existing?.sessionId ?? null,
+      currentStep: job.type === "merge_run" ? "merge requested" : "code review requested",
+      prUrl: job.payload.prUrl ?? issue.prUrl ?? null,
+      labels: issue.labels ?? []
+    });
+    return;
+  }
+  if (job.type === "architect_blocker_run" && job.payload.sessionKey) {
+    const blockedSession = await getAgentSession(job.payload.sessionKey);
+    const sessionKey = `${project.projectId}:architect`;
+    const existing = await getAgentSession(sessionKey);
+    await appendAgentRunPlaceholder({
+      project,
+      workflow,
+      issue: issue ?? (blockedSession?.issueId ? {
+        issueId: blockedSession.issueId,
+        githubIssueNumber: blockedSession.githubIssueNumber ?? null,
+        githubIssueUrl: blockedSession.githubIssueUrl ?? null,
+        prUrl: blockedSession.prUrl ?? null,
+        ownedPaths: blockedSession.ownedPaths ?? []
+      } satisfies Pick<IssueRecord, "issueId" | "githubIssueNumber" | "githubIssueUrl" | "prUrl" | "ownedPaths"> : null),
+      job,
+      sessionKey,
+      role: "architect",
+      title: "Architect",
+      label: "Architect",
+      sessionId: project.architectSessionId ?? existing?.sessionId ?? null,
+      currentStep: "resolving blocker",
+      githubIssueNumber: blockedSession?.githubIssueNumber ?? null,
+      githubIssueUrl: blockedSession?.githubIssueUrl ?? null,
+      prUrl: blockedSession?.prUrl ?? null,
+      labels: blockedSession?.labels ?? []
+    });
+  }
 }
 
 async function cleanupCompletedWorktreesIfEnabled(): Promise<void> {

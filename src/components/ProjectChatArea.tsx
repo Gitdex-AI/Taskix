@@ -266,6 +266,23 @@ function RunningAgentLog({ label, output }: { label: string; output: string }) {
   );
 }
 
+function MessageLiveOutput({ message, jobs }: { message: TimelineMessage; jobs: JobRecord[] }) {
+  const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
+  const outputTail = job?.runtime?.outputTail?.trimEnd();
+  if (outputTail) return <RunningAgentLog label={message.sourceLabel} output={outputTail} />;
+  return (
+    <Text size="xs" c="dimmed" className="running-agent-waiting">
+      Waiting for Codex output...
+    </Text>
+  );
+}
+
+function messageJobElapsed(message: TimelineMessage, jobs: JobRecord[]): string {
+  const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
+  const startedAt = job?.runtime?.startedAt ?? message.updatedAt ?? message.createdAt;
+  return formatElapsed(startedAt);
+}
+
 function findJobSession(job: JobRecord, sessions: AgentSessionRecord[]): AgentSessionRecord | null {
   if (!job.payload.issueId) {
     if (job.type === "workflow_run") return sessions.find((session) => session.role === "architect" && session.workflowId === job.payload.workflowId) ?? null;
@@ -342,7 +359,7 @@ function MessageList({
     ...(optimisticMessage ? [optimisticMessage] : [])
   ].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 
-  const runningStatus = <RunningAgentMessages jobs={jobs} sessions={sessions} workflows={workflows} />;
+  const runningStatus = <RunningAgentMessages jobs={jobs.filter((job) => !messages.some((message) => message.kind === "message" && message.jobId === job.jobId))} sessions={sessions} workflows={workflows} />;
 
   if (!messages.length && !jobs.some((job) => job.status === "running")) {
     return <Text c="dimmed" ta="center" mt="xl">No messages yet.</Text>;
@@ -369,7 +386,11 @@ function MessageList({
                     {formatMessageTime(message.createdAt)}
                   </Text>
                 </Group>
-                <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
+                <Text size="sm" c={message.status === "running" || message.status === "pending" ? "dimmed" : undefined} className={message.status === "running" || message.status === "pending" ? "running-agent-line" : undefined} style={{ whiteSpace: "pre-wrap" }}>
+                  {(message.status === "running" || message.status === "pending") ? <LoaderCircle size={13} className="chat-composer-spinner" /> : null}
+                  <span>{message.content}{message.status === "running" || message.status === "pending" ? `(${messageJobElapsed(message, jobs)})` : ""}</span>
+                </Text>
+                {(message.status === "running" || message.status === "pending") ? <MessageLiveOutput message={message} jobs={jobs} /> : null}
                 {message.executionLogs?.length ? <InlineExecutionLogs logs={message.executionLogs} /> : null}
               </div>
             </div>
@@ -411,11 +432,27 @@ function timelineMessagesForSession(session: AgentSessionRecord): Array<Timeline
     sourceLabel: message.role === "user" ? `You → ${chatRoleLabel(session.role, session.title, session.developerRole)}` : chatRoleLabel(session.role, session.title, session.developerRole),
     sourceRole: session.role,
     session,
-    executionLogs: logsByMessageIndex.get(index)
+    executionLogs: message.executionLogs?.length
+      ? message.executionLogs.map((log) => timelineExecutionLog(log, session))
+      : logsByMessageIndex.get(index)
   } satisfies TimelineMessage));
-  const attachedLogs = new Set([...logsByMessageIndex.values()].flat());
+  const attachedLogs = new Set([
+    ...messages.flatMap((message) => message.executionLogs ?? []),
+    ...[...logsByMessageIndex.values()].flat()
+  ]);
   const unattachedLogs = logs.filter((log) => !attachedLogs.has(log));
   return [...messages, ...unattachedLogs];
+}
+
+function timelineExecutionLog(log: NonNullable<AgentMessage["executionLogs"]>[number], session: AgentSessionRecord): TimelineExecutionLog {
+  return {
+    ...log,
+    kind: "execution-log",
+    sessionKey: session.sessionKey,
+    sourceLabel: chatRoleLabel(session.role, session.title, session.developerRole),
+    sourceRole: session.role,
+    session
+  };
 }
 
 function pairExecutionLogsWithAssistantMessages(messages: AgentMessage[], logs: TimelineExecutionLog[]): Map<number, TimelineExecutionLog[]> {

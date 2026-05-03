@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { architectMergeInstruction } from "@/lib/architect-runner";
 import { appendAgentMessages, createJob, getAgentSession, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
@@ -70,6 +71,20 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       issueId: issue.issueId,
       prUrl: issue.prUrl
     }
+  });
+  await appendAgentRunPlaceholder({
+    project,
+    workflow,
+    issue,
+    job,
+    sessionKey,
+    role: "architect",
+    title: "Architect",
+    label: "Architect",
+    sessionId: project.architectSessionId ?? existingArchitectSession?.sessionId ?? null,
+    currentStep: "merge requested",
+    prUrl: issue.prUrl,
+    labels: issue.labels ?? []
   });
 
   return NextResponse.json({

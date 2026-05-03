@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { agentJobMessageId } from "@/lib/agent-run-messages";
 import { CodexClient } from "@/lib/codex";
 import { developerRoleIds, type DeveloperRoleId } from "@/lib/developer-roles";
 import { GitHubClient } from "@/lib/github";
@@ -209,6 +210,8 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
   issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !qaStateLabels.includes(label.toLowerCase())), ...appliedLabels])];
 
   if (workflow.projectId) {
+    const activeJobId = getActiveJobId();
+    const durationMs = Math.max(0, new Date(qaFinishedAt).getTime() - new Date(qaStartedAt).getTime());
     await appendAgentMessages({
       sessionKey: issue.qaSessionId ?? `${issue.issueId}:qa`,
       projectId: workflow.projectId,
@@ -221,22 +224,32 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
       currentStep: qaResult.passed ? "QA passed" : qaFailureType === "spec" ? "QA blocked by issue specification" : "QA failed",
       startedAt: qaStartedAt,
       finishedAt: qaFinishedAt,
-      durationMs: Math.max(0, new Date(qaFinishedAt).getTime() - new Date(qaStartedAt).getTime()),
+      durationMs,
       githubIssueNumber: issue.githubIssueNumber,
       githubIssueUrl: issue.githubIssueUrl ?? null,
       prUrl: qaPrUrl,
       labels: appliedLabels,
       closedAt: qaCloseAt,
       archivedAt: qaCloseAt,
-      executionLogs: qaResult.executionLog ? [{
-        title: `QA Codex execution for ${issue.title}`,
-        content: qaResult.executionLog,
-        createdAt: qaFinishedAt,
-        status: qaResult.passed ? "ok" : "failed",
-        durationMs: Math.max(0, new Date(qaFinishedAt).getTime() - new Date(qaStartedAt).getTime())
-      }] : [],
+      executionLogs: [],
       messages: [
-        { role: "assistant", content: `Passed: ${qaResult.passed}\nFailure type: ${qaResult.failureType}\n${qaResult.summary}\nFindings:\n${qaResult.findings.map((finding) => `- ${finding}`).join("\n") || "- none"}\nLabels: ${appliedLabels.join(", ")}`, createdAt: new Date().toISOString() }
+        {
+          messageId: activeJobId ? agentJobMessageId(activeJobId) : undefined,
+          jobId: activeJobId,
+          role: "assistant",
+          status: qaResult.passed ? "done" : "blocked",
+          durationMs,
+          executionLogs: qaResult.executionLog ? [{
+            title: `QA Codex execution for ${issue.title}`,
+            content: qaResult.executionLog,
+            createdAt: qaFinishedAt,
+            status: qaResult.passed ? "ok" : "failed",
+            durationMs
+          }] : [],
+          content: `Passed: ${qaResult.passed}\nFailure type: ${qaResult.failureType}\n${qaResult.summary}\nFindings:\n${qaResult.findings.map((finding) => `- ${finding}`).join("\n") || "- none"}\nLabels: ${appliedLabels.join(", ")}`,
+          createdAt: qaFinishedAt,
+          updatedAt: qaFinishedAt
+        }
       ]
     });
   }
@@ -466,6 +479,8 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
     const finishedAt = new Date().toISOString();
     const closeAt = developerResult.prUrl ? finishedAt : null;
     const blockedLabels = developerResult.blockedType === "spec" ? ["taskix:spec-blocked", "taskix:blocked"] : ["taskix:blocked"];
+    const activeJobId = getActiveJobId();
+    const durationMs = Math.max(0, new Date(finishedAt).getTime() - new Date(developerStartedAt).getTime());
     await appendAgentMessages({
       sessionKey: issue.developerSessionId ?? `${issue.issueId}:developer`,
       projectId: workflow.projectId,
@@ -479,22 +494,32 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
       currentStep: developerResult.prUrl ? "developer completed PR" : "developer blocked",
       startedAt: developerStartedAt,
       finishedAt,
-      durationMs: Math.max(0, new Date(finishedAt).getTime() - new Date(developerStartedAt).getTime()),
+      durationMs,
       githubIssueNumber: issue.githubIssueNumber,
       githubIssueUrl: issue.githubIssueUrl ?? null,
       prUrl: developerResult.prUrl || null,
       labels: developerResult.prUrl ? ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : "role:general_developer"] : blockedLabels,
       closedAt: closeAt,
       archivedAt: closeAt,
-      executionLogs: developerResult.executionLog ? [{
-        title: `Developer Codex execution for ${issue.title}`,
-        content: developerResult.executionLog,
-        createdAt: finishedAt,
-        status: developerResult.prUrl ? "ok" : "failed",
-        durationMs: Math.max(0, new Date(finishedAt).getTime() - new Date(developerStartedAt).getTime())
-      }] : [],
+      executionLogs: [],
       messages: [
-        { role: "assistant", content: `Summary: ${developerResult.summary}\nBlocked type: ${developerResult.blockedType}\nBranch: ${developerResult.branch || "none"}\nPR: ${developerResult.prUrl || "none"}\nTests: ${developerResult.testsRun.join(", ") || "none"}`, createdAt: new Date().toISOString() }
+        {
+          messageId: activeJobId ? agentJobMessageId(activeJobId) : undefined,
+          jobId: activeJobId,
+          role: "assistant",
+          status: developerResult.prUrl ? "done" : "blocked",
+          durationMs,
+          executionLogs: developerResult.executionLog ? [{
+            title: `Developer Codex execution for ${issue.title}`,
+            content: developerResult.executionLog,
+            createdAt: finishedAt,
+            status: developerResult.prUrl ? "ok" : "failed",
+            durationMs
+          }] : [],
+          content: `Summary: ${developerResult.summary}\nBlocked type: ${developerResult.blockedType}\nBranch: ${developerResult.branch || "none"}\nPR: ${developerResult.prUrl || "none"}\nTests: ${developerResult.testsRun.join(", ") || "none"}`,
+          createdAt: finishedAt,
+          updatedAt: finishedAt
+        }
       ]
     });
   }
