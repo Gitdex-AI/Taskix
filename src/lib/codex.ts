@@ -655,6 +655,8 @@ Hard rules:
 - Use "implementation" only when the existing issue is executable as written and the developer can fix the PR without architect clarification. In that case, labelsApplied should include "taskix:qa-failed".
 - When failing QA, include actionable findings and reproduction notes. For spec failures, explain the architectural decision that is missing and do not prescribe code changes as if the developer can choose the policy alone.
 - If a required baseline command fails for a repo-level reason that is clearly unrelated to the PR diff, report it as an environment or repository blocker in findings, but do not mark the PR implementation failed solely for that unrelated baseline failure when the acceptance criteria and PR-scoped automated tests pass.
+- The Taskix server normally occupies 127.0.0.1:8000. For browser validation, do not run \`npm run dev\` because it binds to 8000. Start the PR worktree server on 127.0.0.1:8001 instead, for example \`DATA_DIR=/private/tmp/taskix-qa-${input.issueNumber}-dev-data ./node_modules/.bin/next dev -H 127.0.0.1 -p 8001\`, then validate against \`http://127.0.0.1:8001\`.
+- Use an isolated DATA_DIR under /private/tmp for QA dev-server and build checks that need runtime state, so local Taskix SQLite locks do not affect the PR verdict.
 - Do not modify the current Taskix app checkout or its .git directory.
 - The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
 - Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.

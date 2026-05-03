@@ -34,7 +34,7 @@ Developers implement the requested change, add repeatable test cases where feasi
 
 Architect issue breakdown must include directly related test files in `ownedPaths` when the acceptance criteria affect existing automated checks. Developers may update tests that directly verify the issue acceptance criteria, even when those files live outside the primary implementation directory, and must mention that test-scope reason in the PR summary. This exception does not allow broad refactors or unrelated test churn.
 
-QA should validate the submitted test cases first, then perform focused web UI checks for the user-visible path. Manual clicking is not a substitute for repeatable tests; it is used to confirm that the tested behavior is wired correctly in the browser. For workflow UI changes, QA should run `npm run dev`, visit the affected project page, trigger the relevant controls, and confirm the visible next action matches the issue acceptance criteria.
+QA should validate the submitted test cases first, then perform focused web UI checks for the user-visible path. Manual clicking is not a substitute for repeatable tests; it is used to confirm that the tested behavior is wired correctly in the browser. The main Taskix server normally occupies `127.0.0.1:8000`, so QA worktrees should run browser validation on `127.0.0.1:8001`, for example `DATA_DIR=/private/tmp/taskix-qa-<issue>-dev-data ./node_modules/.bin/next dev -H 127.0.0.1 -p 8001`, then visit the affected project page, trigger the relevant controls, and confirm the visible next action matches the issue acceptance criteria.
 
 QA should test from user-visible behavior and leave a GitHub issue comment with:
 
@@ -42,7 +42,7 @@ QA should test from user-visible behavior and leave a GitHub issue comment with:
 - Commands run, including `npm test`, `npm run typecheck`, and `npm run build`.
 - Automated test cases covered and their result.
 - Manual browser scenarios tested.
-- For UI or interaction changes, browser validation run with `npm run dev` at `http://127.0.0.1:8000`.
+- For UI or interaction changes, browser validation run from the QA worktree at `http://127.0.0.1:8001`, using an isolated `DATA_DIR` under `/private/tmp`.
 - Pages visited, controls clicked, and observed results for browser validation.
 - Screenshots, or a concise visual description when screenshots are not available.
 - Findings with severity, reproduction steps, expected result, and actual result.
