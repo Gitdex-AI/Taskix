@@ -86,7 +86,7 @@ export function ProjectChatArea({
         next[index] = job;
         return next;
       });
-      if (job.status !== "running") scheduleRefresh();
+      scheduleRefresh();
     };
     source.addEventListener("snapshot", (event) => {
       try {
@@ -359,7 +359,7 @@ function MessageList({
     ...(optimisticMessage ? [optimisticMessage] : [])
   ].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
 
-  const runningStatus = <RunningAgentMessages jobs={jobs.filter((job) => !messages.some((message) => message.kind === "message" && message.jobId === job.jobId))} sessions={sessions} workflows={workflows} />;
+  const runningStatus = null;
 
   if (!messages.length && !jobs.some((job) => job.status === "running")) {
     return <Text c="dimmed" ta="center" mt="xl">No messages yet.</Text>;
