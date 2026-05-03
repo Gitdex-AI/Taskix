@@ -13,6 +13,7 @@ import { qaValidationInstruction } from "@/lib/qa-validation-instruction";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, cancelPendingJobs, createJob, getAgentSession, getJob, listJobs, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { DeveloperIssueResult, IssueRecord, IssueSpec, ProjectRecord, QaPrReviewResult, WorkflowRecord } from "@/lib/types";
+import { deriveWorkflowStatus } from "@/lib/workflow-status";
 import { rebuildDeveloperWorktree } from "@/lib/worktree-manager";
 
 const execFileAsync = promisify(execFile);
@@ -906,17 +907,6 @@ async function readPullRequestRefs(repo: string, pr: string): Promise<{ head: st
   } catch {
     return { head: null, base: null, state: null, merged: false };
   }
-}
-
-function deriveWorkflowStatus(workflow: WorkflowRecord): WorkflowRecord["status"] {
-  if (!workflow.issues.length) return workflow.status;
-  const issues = workflow.issues;
-  const hasBlocked = issues.some((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:blocked", "taskix:qa-failed", "taskix:spec-blocked", "taskix:env-blocked"]));
-  if (hasBlocked) return "blocked";
-  const allDone = issues.every((issue) => includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:merged", "taskix:deployed"]) || issue.prState === "MERGED");
-  if (allDone) return "done";
-  const anyProgress = issues.some((issue) => Boolean(issue.prUrl) || issue.prState === "OPEN" || includesAny([...(issue.labels ?? []), ...(issue.prLabels ?? [])], ["taskix:dev-running", "taskix:architect-review", "taskix:need-qa", "taskix:qa-running", "taskix:qa-passed", "taskix:ready-to-merge"]));
-  return anyProgress ? "in_progress" : workflow.status;
 }
 
 function includesAny(values: string[], candidates: string[]): boolean {
