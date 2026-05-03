@@ -55,6 +55,11 @@ export async function verifyLocalGitHubRepo(repo: string): Promise<void> {
   await execFileAsync("gh", ["api", `repos/${repo}`, "--jq", ".full_name"]);
 }
 
+export async function resolveGitHubRepoWithGh(repo: string): Promise<string> {
+  const { stdout } = await execFileAsync("gh", ["repo", "view", repo, "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
+  return stdout.trim() || repo;
+}
+
 export async function getProjectTriageWithGh(repo: string): Promise<ProjectTriageItem[]> {
   const { stdout } = await execFileAsync("gh", [
     "issue",
@@ -211,13 +216,14 @@ async function getTargetLabelNamesWithGh(repo: string, target: number | string):
 }
 
 export async function getIssueSnapshotWithGh(repo: string, issueNumber: number): Promise<GhIssueSnapshot> {
-  const { stdout: issueStdout } = await execFileAsync("gh", ["issue", "view", String(issueNumber), "--repo", repo, "--json", "number,url,state,labels"]);
+  const canonicalRepo = await resolveGitHubRepoWithGh(repo);
+  const { stdout: issueStdout } = await execFileAsync("gh", ["issue", "view", String(issueNumber), "--repo", canonicalRepo, "--json", "number,url,state,labels"]);
   const issue = JSON.parse(issueStdout) as { number: number; url: string; state: string; labels: Array<{ name: string }> };
   const { stdout: prsStdout } = await execFileAsync("gh", [
     "pr",
     "list",
     "--repo",
-    repo,
+    canonicalRepo,
     "--state",
     "all",
     "--search",
