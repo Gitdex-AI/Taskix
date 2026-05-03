@@ -1,10 +1,10 @@
-import { runWorkflowArchitectReview, runWorkflowMerge } from "@/lib/architect-runner";
-import { runArchitectBlockerResolution } from "@/lib/architect-blocker-runner";
+import { architectMergeInstruction, architectReviewInstruction, runWorkflowArchitectReview, runWorkflowMerge } from "@/lib/architect-runner";
+import { architectBlockerInstruction, runArchitectBlockerResolution } from "@/lib/architect-blocker-runner";
 import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
-import { runWorkflow, runWorkflowIssue, runWorkflowQa, syncWorkflowFromGitHub } from "@/lib/orchestrator";
+import { developerIssueInstruction, qaValidationInstruction, runWorkflow, runWorkflowIssue, runWorkflowQa, syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { runWithJobRuntime } from "@/lib/job-runtime";
-import { claimNextPendingJob, claimPendingJob, getAgentSession, getJob, getProject, getWorkflow, saveJob } from "@/lib/store";
-import type { IssueRecord, JobRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
+import { appendAgentMessages, claimNextPendingJob, claimPendingJob, getAgentSession, getJob, getProject, getWorkflow, saveJob } from "@/lib/store";
+import type { AgentSessionRecord, IssueRecord, JobRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
 import { getSettings } from "@/lib/settings";
 import { cleanupInactiveWorktrees } from "@/lib/worktree-manager";
 
@@ -50,7 +50,10 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
         skipped = true;
         return;
       }
-      if (project && workflow) await ensureRunningPlaceholder(project, workflow, job);
+      if (project && workflow) {
+        await ensureRunningPlaceholder(project, workflow, job);
+        await sleep(1000);
+      }
       if (job.type === "architect_blocker_run" && project && job.payload.sessionKey) {
         await runArchitectBlockerResolution(project, job.payload.sessionKey);
       } else if (job.type === "issue_run" && job.payload.issueId) {
@@ -107,12 +110,27 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
     return;
   }
   if (job.type === "issue_run" && issue) {
+    const sessionKey = issue.developerSessionId ?? `${issue.issueId}:developer`;
+    const instruction = developerIssueInstruction(issue);
+    await appendRunUserInstruction({
+      project,
+      workflow,
+      issue,
+      sessionKey,
+      role: "developer",
+      title: `${issue.developerRole ?? "general_developer"}: ${issue.title}`,
+      content: instruction,
+      developerRole: issue.developerRole ?? "general_developer",
+      ownedPaths: issue.ownedPaths ?? [],
+      currentStep: "developer handling GitHub issue",
+      labels: ["taskix:dev-running"]
+    });
     await appendAgentRunPlaceholder({
       project,
       workflow,
       issue,
       job,
-      sessionKey: issue.developerSessionId ?? `${issue.issueId}:developer`,
+      sessionKey,
       role: "developer",
       title: `${issue.developerRole ?? "general_developer"}: ${issue.title}`,
       label: issue.developerRole ?? "Dev",
@@ -123,12 +141,27 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
     return;
   }
   if (job.type === "qa_run" && issue) {
+    const sessionKey = issue.qaSessionId ?? `${issue.issueId}:qa`;
+    const prUrl = job.payload.prUrl ?? issue.prUrl ?? "";
+    const instruction = qaValidationInstruction(prUrl, issue, job.payload.headSha ?? null);
+    await appendRunUserInstruction({
+      project,
+      workflow,
+      issue,
+      sessionKey,
+      role: "qa",
+      title: `QA: ${issue.title}`,
+      content: instruction,
+      currentStep: "QA validating PR",
+      prUrl,
+      labels: ["taskix:need-qa", "taskix:qa-running"]
+    });
     await appendAgentRunPlaceholder({
       project,
       workflow,
       issue,
       job,
-      sessionKey: issue.qaSessionId ?? `${issue.issueId}:qa`,
+      sessionKey,
       role: "qa",
       title: `QA: ${issue.title}`,
       label: "QA",
@@ -141,6 +174,20 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
   if ((job.type === "architect_review_run" || job.type === "merge_run") && issue) {
     const sessionKey = `${issue.issueId}:reviewer`;
     const existing = await getAgentSession(sessionKey);
+    const instruction = job.type === "merge_run" ? architectMergeInstruction(project, issue) : architectReviewInstruction(issue);
+    await appendRunUserInstruction({
+      project,
+      workflow,
+      issue,
+      sessionKey,
+      role: "reviewer",
+      title: "Reviewer",
+      content: instruction,
+      sessionId: existing?.sessionId ?? null,
+      currentStep: job.type === "merge_run" ? "merge requested" : "review requested",
+      prUrl: job.payload.prUrl ?? issue.prUrl ?? null,
+      labels: issue.labels ?? []
+    });
     await appendAgentRunPlaceholder({
       project,
       workflow,
@@ -161,6 +208,29 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
     const blockedSession = await getAgentSession(job.payload.sessionKey);
     const sessionKey = `${blockedSession?.issueId ?? job.payload.issueId ?? job.payload.sessionKey}:architect`;
     const existing = await getAgentSession(sessionKey);
+    if (blockedSession) {
+      await appendRunUserInstruction({
+        project,
+        workflow,
+        issue: issue ?? {
+          issueId: blockedSession.issueId ?? job.payload.issueId ?? job.payload.sessionKey,
+          githubIssueNumber: blockedSession.githubIssueNumber ?? null,
+          githubIssueUrl: blockedSession.githubIssueUrl ?? null,
+          prUrl: blockedSession.prUrl ?? null,
+          ownedPaths: blockedSession.ownedPaths ?? []
+        },
+        sessionKey,
+        role: "architect",
+        title: "Architect",
+        content: architectBlockerInstruction(blockedSession),
+        sessionId: existing?.sessionId ?? null,
+        currentStep: "resolving blocker",
+        githubIssueNumber: blockedSession.githubIssueNumber ?? null,
+        githubIssueUrl: blockedSession.githubIssueUrl ?? null,
+        prUrl: blockedSession.prUrl ?? null,
+        labels: blockedSession.labels ?? []
+      });
+    }
     await appendAgentRunPlaceholder({
       project,
       workflow,
@@ -184,6 +254,52 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
       labels: blockedSession?.labels ?? []
     });
   }
+}
+
+async function appendRunUserInstruction(input: {
+  project: ProjectRecord;
+  workflow: WorkflowRecord;
+  issue: Pick<IssueRecord, "issueId" | "githubIssueNumber" | "githubIssueUrl" | "prUrl" | "ownedPaths">;
+  sessionKey: string;
+  role: AgentSessionRecord["role"];
+  title: string;
+  content: string;
+  sessionId?: string | null;
+  developerRole?: AgentSessionRecord["developerRole"];
+  ownedPaths?: string[];
+  currentStep: string;
+  githubIssueNumber?: number | null;
+  githubIssueUrl?: string | null;
+  prUrl?: string | null;
+  labels?: string[];
+}): Promise<void> {
+  const existing = await getAgentSession(input.sessionKey);
+  if (existing?.messages.some((message) => message.content === input.content)) return;
+  await appendAgentMessages({
+    sessionKey: input.sessionKey,
+    projectId: input.project.projectId,
+    role: input.role,
+    title: input.title,
+    sessionId: input.sessionId ?? existing?.sessionId ?? null,
+    workflowId: input.workflow.workflowId,
+    issueId: input.issue.issueId,
+    developerRole: input.developerRole,
+    ownedPaths: input.ownedPaths ?? input.issue.ownedPaths ?? [],
+    status: "active",
+    currentStep: input.currentStep,
+    startedAt: new Date().toISOString(),
+    githubIssueNumber: input.githubIssueNumber ?? input.issue.githubIssueNumber ?? null,
+    githubIssueUrl: input.githubIssueUrl ?? input.issue.githubIssueUrl ?? null,
+    prUrl: input.prUrl ?? input.issue.prUrl ?? null,
+    labels: input.labels,
+    messages: [
+      { role: "user", content: input.content, createdAt: new Date().toISOString() }
+    ]
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function cleanupCompletedWorktreesIfEnabled(): Promise<void> {
