@@ -25,6 +25,7 @@ import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
 import { getAutoRunState } from "@/lib/auto-run-control";
 import { canAutoRunDeveloper } from "@/lib/auto-run-policy";
 import { requireConsolePageAuth } from "@/lib/console-auth";
+import { checkGhStatus, getCachedGhStatus, saveGhStatus } from "@/lib/gh-status";
 import { findReadyForArchitectPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
 import { findDependencyIssue, isDependencySatisfied } from "@/lib/issue-dependencies";
 import { getIssueStage, type IssueStage } from "@/lib/issue-stage";
@@ -55,12 +56,13 @@ export default async function ProjectDetailPage({
 
   const activeRole = query.role === "architect" ? "architect" : query.role === "devops" ? "devops" : "product_manager";
   const activeSessionKey = query.session ?? `${project.projectId}:${activeRole}`;
-  const [sessions, workflows, jobs, activeSession, projects] = await Promise.all([
+  const [sessions, workflows, jobs, activeSession, projects, ghUserLogin] = await Promise.all([
     listAgentSessions(project.projectId),
     listProjectWorkflows(project.projectId),
     listJobs(project.projectId),
     getAgentSession(activeSessionKey),
-    listProjects()
+    listProjects(),
+    getGhUserLogin()
   ]);
   const switcherProjects = projects.map(({ projectId, name, slug, githubAccount, githubRepo }) => ({
     projectId,
@@ -139,6 +141,7 @@ export default async function ProjectDetailPage({
           autoRunState={autoRunState}
           autorunEnabled={query.autorun === "1"}
           switcherProjects={switcherProjects}
+          ghUserLogin={ghUserLogin}
         />
 
         <main className="chat-panel">
@@ -156,6 +159,18 @@ function buildProjectNextPath(projectId: string, query: { role?: string; session
   }
   const search = params.toString();
   return search ? `/projects/${projectId}?${search}` : `/projects/${projectId}`;
+}
+
+async function getGhUserLogin(): Promise<string | null> {
+  const cached = getCachedGhStatus();
+  if (cached?.ok && cached.user.output.trim()) return cached.user.output.trim();
+  try {
+    const status = await checkGhStatus();
+    saveGhStatus(status);
+    return status.ok && status.user.output.trim() ? status.user.output.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 function sortWorkflowsLatestFirst(workflows: WorkflowRecord[]): WorkflowRecord[] {
@@ -216,6 +231,7 @@ function ProjectWorkspaceSidebar(input: {
   autoRunState: AutoRunState | null;
   autorunEnabled: boolean;
   switcherProjects: ComponentProps<typeof ProjectSwitcher>["projects"];
+  ghUserLogin: string | null;
 }) {
   const project = input.project;
 
@@ -329,8 +345,8 @@ function ProjectWorkspaceSidebar(input: {
           <Group gap={8} wrap="nowrap" className="project-sidebar-user">
             <UserCircle size={18} />
             <div>
-              <Text size="xs" fw={760}>GitHub</Text>
-              <Text size="xs" c="dimmed" lineClamp={1}>{project.githubRepo.split("/")[0] || "not configured"}</Text>
+              <Text size="xs" fw={760}>{input.ghUserLogin ?? "GitHub not connected"}</Text>
+              <Text size="xs" c="dimmed" lineClamp={1}>gh account</Text>
             </div>
           </Group>
           <Group gap={4} wrap="nowrap">
