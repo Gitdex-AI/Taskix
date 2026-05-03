@@ -9,7 +9,7 @@ import { cancelPendingJobs, createJob, listAgentSessions, listJobs, listProjectW
 import type { AgentSessionRecord, IssueRecord, JobRecord, JobType, ProjectRecord, WorkflowRecord } from "@/lib/types";
 
 const autoRunnableJobTypes: JobType[] = ["architect_blocker_run", "issue_run", "qa_run", "architect_review_run", "merge_run"];
-const returnRemoveLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:env-blocked", "taskix:ready-to-merge", "taskix:need-qa", "taskix:qa-running", "taskix:blocked"];
+const returnRemoveLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:env-blocked", "taskix:ready-to-merge", "taskix:need-qa", "taskix:qa-running", "taskix:blocked", "taskix:needs-rebase"];
 const qaRemoveLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:env-blocked", "taskix:ready-to-merge"];
 const devLabels = ["taskix:dev-running"];
 const qaLabels = ["taskix:need-qa", "taskix:qa-running"];
@@ -152,7 +152,7 @@ async function findOrCreateNextBatch(
     .flatMap((workflow) => workflow.issues.map((issue) => ({ workflow, issue })))
     .filter(({ issue }) => !issueScope.size || issueScope.has(issue.issueId));
   const failedReturnRows = issueRows.filter(({ workflow, issue }) => shouldReturnFailedJobToDeveloper(issue, workflow, jobs));
-  const returnRows = failedReturnRows.length ? failedReturnRows : issueRows.filter(({ issue }) => shouldReturnQaFailureToDeveloper(issue));
+  const returnRows = failedReturnRows.length ? failedReturnRows : issueRows.filter(({ issue }) => shouldReturnQaFailureToDeveloper(issue) || shouldReturnRebaseToDeveloper(issue));
   const jobsToRun: JobRecord[] = [];
   jobsToRun.push(...await Promise.all(returnRows.map(({ workflow, issue }) => ensureReturnDeveloperJob(project, workflow, issue))));
 
@@ -233,6 +233,13 @@ function shouldReturnQaFailureToDeveloper(issue: IssueRecord): boolean {
     && issue.prState !== "MERGED"
     && hasAnyIssueLabel(issue, ["qa-failed", "taskix:qa-failed"])
     && !hasAnyIssueLabel(issue, ["taskix:spec-blocked"]);
+}
+
+function shouldReturnRebaseToDeveloper(issue: IssueRecord): boolean {
+  return Boolean(issue.prUrl)
+    && !isClosedIssue(issue)
+    && issue.prState !== "MERGED"
+    && hasAnyIssueLabel(issue, ["taskix:needs-rebase"]);
 }
 
 function shouldReturnFailedJobToDeveloper(issue: IssueRecord, workflow: WorkflowRecord, jobs: JobRecord[]): boolean {

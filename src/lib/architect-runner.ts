@@ -4,10 +4,12 @@ import { addLabelsWithGh, commentIssueWithGh, removeLabelsWithGh } from "@/lib/g
 import { getActiveJobId } from "@/lib/job-runtime";
 import { syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { getSettings } from "@/lib/settings";
-import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveWorkflow } from "@/lib/store";
-import type { IssueRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
+import { appendAgentMessages, createJob, getAgentSession, getProject, getWorkflow, listJobs, saveWorkflow } from "@/lib/store";
+import type { IssueRecord, ProjectRecord, ReviewerMergeResult, WorkflowRecord } from "@/lib/types";
 
 const removeReviewLabels = ["taskix:architect-review", "taskix:ready-to-merge", "taskix:blocked"];
+const removeMergeReturnLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:ready-to-merge", "taskix:need-qa", "taskix:qa-running", "taskix:blocked", "taskix:needs-rebase"];
+const developerRebaseLabels = ["taskix:needs-rebase", "taskix:dev-running"];
 
 export async function runWorkflowArchitectReview(workflowId: string, issueId: string, project?: ProjectRecord | null): Promise<void> {
   if (!project?.githubRepo) throw new Error("Project has no GitHub repo configured.");
@@ -128,13 +130,25 @@ export async function runWorkflowMerge(workflowId: string, issueId: string, proj
     throw new Error("Reviewer code review must pass before merge.");
   }
 
-  await runArchitectMergeRequest(project, workflow, issue);
+  const result = await runArchitectMergeRequest(project, workflow, issue);
+  if (result.decision === "needs_developer_rebase") {
+    await returnMergeConflictToDeveloper(project, workflow, issue, result);
+    return;
+  }
+  if (result.decision === "blocked") {
+    workflow.status = "blocked";
+    workflow.timeline.push(`Reviewer merge blocked ${issue.issueId}: ${result.blocker || result.summary}`);
+    await saveWorkflow(workflow);
+    throw new Error(result.blocker || result.summary || "Reviewer merge blocked.");
+  }
   await syncWorkflowUntilMerged(project, workflow.workflowId, issue.issueId);
 }
 
-async function runArchitectMergeRequest(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord): Promise<void> {
+async function runArchitectMergeRequest(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord): Promise<ReviewerMergeResult> {
   const now = new Date().toISOString();
   const content = architectMergeInstruction(project, issue);
+  const prUrl = issue.prUrl;
+  if (!prUrl) throw new Error("Issue has no pull request to merge.");
 
   workflow.timeline.push(`Requested reviewer merge handling for ${issue.issueId}.`);
   await saveWorkflow(workflow);
@@ -165,11 +179,12 @@ async function runArchitectMergeRequest(project: ProjectRecord, workflow: Workfl
       ]
     });
   }
-  const result = await codex.reviewerChat({
+  const result = await codex.reviewerMergePr({
     projectName: project.name,
-    githubRepo: project.githubRepo,
-    message: content,
-    sessionId: existingReviewerSession?.sessionId ?? null
+    repo: project.githubRepo,
+    issueNumber: issue.githubIssueNumber ?? null,
+    issueId: issue.issueId,
+    prUrl
   });
   const mergeDurationMs = Math.max(0, Date.now() - mergeStartedAt);
   const activeJobId = getActiveJobId();
@@ -180,7 +195,7 @@ async function runArchitectMergeRequest(project: ProjectRecord, workflow: Workfl
     projectId: project.projectId,
     role: "reviewer",
     title: "Reviewer",
-    sessionId: result.sessionId ?? existingReviewerSession?.sessionId ?? null,
+    sessionId: existingReviewerSession?.sessionId ?? null,
     workflowId: workflow.workflowId,
     issueId: issue.issueId,
     prUrl: issue.prUrl ?? null,
@@ -201,12 +216,64 @@ async function runArchitectMergeRequest(project: ProjectRecord, workflow: Workfl
           status: "ok",
           durationMs: mergeDurationMs
         }] : [],
-        content: result.text,
+        content: `Decision: ${result.decision}\n${result.summary}${result.blocker && result.blocker !== "none" ? `\nBlocker: ${result.blocker}` : ""}`,
         createdAt: finishedAt,
         updatedAt: finishedAt
       }
     ]
   });
+  return result;
+}
+
+async function returnMergeConflictToDeveloper(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord, result: ReviewerMergeResult): Promise<void> {
+  if (!issue.prUrl) throw new Error("Issue has no pull request to return to developer.");
+  const issueLabelsToRemove = labelsToRemoveForMergeReturn(issue.labels ?? []);
+  const prLabelsToRemove = labelsToRemoveForMergeReturn(issue.prLabels ?? []);
+  const comment = [
+    "This PR was returned to developer for rebase or branch update.",
+    "",
+    `Merge blocker: ${result.blocker || result.summary}`,
+    "",
+    "Developer action:",
+    "- Rebase or merge latest main into the PR branch.",
+    "- Resolve conflicts on the developer branch.",
+    "- Push the same PR branch and request QA recheck because the branch changed after QA/review."
+  ].join("\n");
+
+  if (issue.githubIssueNumber) {
+    if (issueLabelsToRemove.length) await removeLabelsWithGh(project.githubRepo, issue.githubIssueNumber, issueLabelsToRemove);
+    await addLabelsWithGh(project.githubRepo, issue.githubIssueNumber, developerRebaseLabels);
+    await commentIssueWithGh(project.githubRepo, issue.githubIssueNumber, comment);
+  }
+  if (prLabelsToRemove.length) await removeLabelsWithGh(project.githubRepo, issue.prUrl, prLabelsToRemove);
+  await addLabelsWithGh(project.githubRepo, issue.prUrl, developerRebaseLabels);
+
+  issue.labels = mergeLabels(issue.labels ?? [], issueLabelsToRemove, developerRebaseLabels);
+  issue.prLabels = mergeLabels(issue.prLabels ?? [], prLabelsToRemove, developerRebaseLabels);
+  workflow.status = "in_progress";
+  workflow.timeline.push(`Returned ${issue.issueId} to developer for rebase after merge blocker: ${result.blocker || result.summary}`);
+
+  const existingJob = (await listJobs(project.projectId)).find((job) => (
+    job.type === "issue_run"
+    && (job.status === "pending" || job.status === "running")
+    && job.payload.workflowId === workflow.workflowId
+    && job.payload.issueId === issue.issueId
+  ));
+  if (!existingJob) {
+    await createJob({
+      projectId: project.projectId,
+      type: "issue_run",
+      payload: {
+        workflowId: workflow.workflowId,
+        issueId: issue.issueId,
+        prUrl: issue.prUrl,
+        branch: issue.branch ?? null,
+        returnedFromQa: true,
+        previousPrUrl: issue.prUrl
+      }
+    });
+  }
+  await saveWorkflow(workflow);
 }
 
 export function architectReviewInstruction(issue: Pick<IssueRecord, "githubIssueNumber" | "issueId" | "title" | "prUrl">): string {
@@ -238,6 +305,11 @@ export function architectMergeInstruction(project: ProjectRecord, issue: IssueRe
 function labelsToRemove(labels: string[]): string[] {
   const lowerLabels = new Set(labels.map((label) => label.toLowerCase()));
   return removeReviewLabels.filter((label) => lowerLabels.has(label));
+}
+
+function labelsToRemoveForMergeReturn(labels: string[]): string[] {
+  const lowerLabels = new Set(labels.map((label) => label.toLowerCase()));
+  return removeMergeReturnLabels.filter((label) => lowerLabels.has(label));
 }
 
 function mergeLabels(existing: string[], removed: string[], applied: string[]): string[] {

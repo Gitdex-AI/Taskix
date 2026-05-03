@@ -32,6 +32,10 @@ describe("canAutoRunQa", () => {
   it("does not restart QA for environment-blocked issues", () => {
     assert.equal(canAutoRunQa(issue({ labels: ["taskix:env-blocked"] })), false);
   });
+
+  it("does not start QA for PRs returned for rebase", () => {
+    assert.equal(canAutoRunQa(issue({ labels: ["taskix:needs-rebase"] })), false);
+  });
 });
 
 describe("canAutoRunDeveloper", () => {
@@ -49,5 +53,9 @@ describe("canAutoRunDeveloper", () => {
 
   it("does not start developer work for environment-blocked issues", () => {
     assert.equal(canAutoRunDeveloper(issue({ prUrl: null, prState: null, labels: ["taskix:env-blocked"] })), false);
+  });
+
+  it("does not treat rebase-required PRs as fresh developer work", () => {
+    assert.equal(canAutoRunDeveloper(issue({ prUrl: null, prState: null, labels: ["taskix:needs-rebase"] })), false);
   });
 });

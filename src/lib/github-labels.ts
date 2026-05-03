@@ -10,6 +10,7 @@ export const taskixLabels = [
   { name: "taskix:env-blocked", color: "5319e7", description: "Taskix workflow blocked by local validation environment" },
   { name: "taskix:spec-blocked", color: "b60205", description: "Taskix issue needs architect clarification" },
   { name: "taskix:ready-to-merge", color: "0e8a16", description: "Taskix PR is ready to merge" },
+  { name: "taskix:needs-rebase", color: "d93f0b", description: "Taskix PR must return to developer for rebase or branch update" },
   { name: "taskix:merged", color: "5319e7", description: "Taskix PR merged" },
   { name: "taskix:deployed", color: "0052cc", description: "Taskix deployment completed" },
   { name: "taskix:blocked", color: "b60205", description: "Taskix workflow blocked" },

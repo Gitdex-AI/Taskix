@@ -3,7 +3,7 @@ import { addLabelsWithGh, commentIssueWithGh, removeLabelsWithGh } from "@/lib/g
 import { cancelPendingJobs, createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
-const removeReadyLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:env-blocked", "taskix:ready-to-merge", "taskix:need-qa", "taskix:qa-running", "taskix:blocked"];
+const removeReadyLabels = ["qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:env-blocked", "taskix:ready-to-merge", "taskix:need-qa", "taskix:qa-running", "taskix:blocked", "taskix:needs-rebase"];
 const addDeveloperLabels = ["taskix:dev-running"];
 
 export async function POST(_request: Request, { params }: { params: Promise<{ projectId: string; issueId: string }> }) {
@@ -25,6 +25,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   const canReturnToDeveloper = labels.has("qa-passed")
     || labels.has("taskix:qa-passed")
     || labels.has("taskix:ready-to-merge")
+    || labels.has("taskix:needs-rebase")
     || labels.has("qa-failed")
     || labels.has("taskix:qa-failed");
   if (!canReturnToDeveloper) return NextResponse.json({ error: "Issue is not ready to return to developer." }, { status: 409 });

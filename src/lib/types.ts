@@ -95,6 +95,15 @@ export type ArchitectPrReviewResult = {
   executionLog?: string;
 };
 
+export type ReviewerMergeDecision = "merged" | "needs_developer_rebase" | "blocked";
+
+export type ReviewerMergeResult = {
+  decision: ReviewerMergeDecision;
+  summary: string;
+  blocker: string;
+  executionLog?: string;
+};
+
 export type QaPrReviewResult = {
   passed: boolean;
   failureType: "none" | "implementation" | "spec" | "environment" | "stale";

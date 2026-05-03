@@ -8,7 +8,7 @@ import { developerRoleIds, developerRoleProfile, formatDeveloperRoleCatalog } fr
 import { expectedDeveloperBaseBranch } from "@/lib/issue-run-policy";
 import { getActiveJobId } from "@/lib/job-runtime";
 import { recordJobAgentFinal, touchJobRuntime } from "@/lib/store";
-import type { ArchitectPrReviewResult, ArchitectReviewResult, DeveloperIssueResult, DeveloperResult, IssueSpec, QaPrReviewResult, QaResult } from "@/lib/types";
+import type { ArchitectPrReviewResult, ArchitectReviewResult, DeveloperIssueResult, DeveloperResult, IssueSpec, QaPrReviewResult, QaResult, ReviewerMergeResult } from "@/lib/types";
 import { dataDir, rootDir } from "@/lib/paths";
 import type { Settings } from "@/lib/types";
 
@@ -217,6 +217,48 @@ ${input.message}`;
         sessionId: input.sessionId
       }
     );
+  }
+
+  async reviewerMergePr(input: {
+    repo: string;
+    issueNumber?: number | null;
+    issueId: string;
+    prUrl: string;
+    projectName: string;
+  }): Promise<ReviewerMergeResult> {
+    const workspaceDir = await this.prepareArchitectWorkspace(input.repo, `merge-${input.issueNumber ?? input.issueId}`);
+    const schema = objectSchema({
+      decision: { type: "string", enum: ["merged", "needs_developer_rebase", "blocked"] },
+      summary: { type: "string" },
+      blocker: { type: "string" }
+    });
+    const prompt = `${rolePrompts.reviewer}
+
+GitHub repo: ${input.repo}
+Issue: ${input.issueNumber ? `#${input.issueNumber}` : input.issueId}
+PR: ${input.prUrl}
+Workspace: ${workspaceDir}
+
+Task:
+- Read the issue, PR state, checks, labels, comments, and mergeability with gh. Treat GitHub as the source of truth.
+- Merge only if taskix:ready-to-merge is present and no blocker exists.
+
+Hard rules:
+- If merged successfully, return decision "merged".
+- If merge is blocked by conflicts, non-fast-forward state, branch out of date, merge queue/base mismatch, or any rebase-required condition, return decision "needs_developer_rebase". Do not edit code or resolve conflicts as reviewer.
+- If blocked by checks, policy, permissions, or unclear GitHub state not requiring developer rebase, return decision "blocked".
+- Do not modify the current Taskix app checkout or its .git directory.
+- The current working directory is the isolated reviewer clone: ${workspaceDir}.
+- Run git and gh commands only in the current working directory unless explicitly inspecting GitHub metadata with gh.
+
+Return JSON with decision, summary, blocker. Set blocker to the exact GitHub blocker or "none" if merged.`;
+    const result = await this.runJsonResult<ReviewerMergeResult>(prompt, schema, { cwd: workspaceDir });
+    return result.value ? { ...result.value, executionLog: result.executionLog } : {
+      decision: "blocked",
+      summary: `Reviewer merge runner did not complete for ${input.prUrl}.`,
+      blocker: result.error ?? "Codex did not return a valid merge decision.",
+      executionLog: result.executionLog
+    };
   }
 
   async architectResolveBlocker(input: {
