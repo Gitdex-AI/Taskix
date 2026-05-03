@@ -496,7 +496,7 @@ body.workspace-mode-body .topbar {
 
 .project-chat-layout {
   display: grid;
-  grid-template-columns: clamp(300px, 25vw, 380px) minmax(0, 1fr);
+  grid-template-columns: clamp(360px, 30vw, 460px) minmax(0, 1fr);
   gap: 0;
   align-items: start;
   min-height: 100vh;
@@ -1453,7 +1453,7 @@ body.workspace-mode-body .topbar {
 
 @media (max-width: 1180px) {
   .project-chat-layout {
-    grid-template-columns: clamp(280px, 30vw, 340px) minmax(0, 1fr);
+    grid-template-columns: clamp(320px, 34vw, 400px) minmax(0, 1fr);
   }
 
   .workflow-detail-layout {
