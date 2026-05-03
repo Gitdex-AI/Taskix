@@ -698,6 +698,8 @@ Task:
 
 Hard rules:
 - If Expected PR head SHA is captured, verify the PR head still matches it before testing. If it changed, report blocked/stale QA instead of testing a moving target.
+- You may run git fetch/checkout/reset inside the isolated QA clone when needed to validate the expected PR head. Prefer checking out the PR branch or exact expected SHA before running npm/browser checks.
+- If the isolated QA clone is on the wrong branch or commit, recover it yourself with git/gh commands in that clone. Report environment only if recovery fails after reasonable attempts.
 - Do not create/edit GitHub issues, PRs, labels, or comments. Taskix server will publish QA evidence and labels after you return JSON.
 - Enforce ownedPaths, but allow minimal changes to automated test files that directly verify this issue's acceptance criteria, even when the architect omitted those test files from ownedPaths. Do not fail QA for that narrow test-scope exception; mention it in summary if relevant.
 - Treat Next-generated next-env.d.ts route import changes as local tooling noise unless the issue explicitly concerns Next type generation. Do not fail QA solely because next dev, next build, or tsc rewrote next-env.d.ts; restore it before reporting final git status when possible, or mention it as uncommitted generated noise.
@@ -719,9 +721,9 @@ Hard rules:
 - The Taskix server normally occupies 127.0.0.1:8000. For browser validation, do not run \`npm run dev\` because it binds to 8000. Use the assigned preview URL ${previewUrl}. Start the PR worktree server on that port, for example \`DATA_DIR=/private/tmp/taskix-qa-${input.issueNumber}-dev-data ./node_modules/.bin/next dev -H 127.0.0.1 -p ${previewPort}\`, then validate against \`${previewUrl}\`.
 - Use an isolated DATA_DIR under /private/tmp for QA dev-server and build checks that need runtime state, so local Taskix SQLite locks do not affect the PR verdict.
 - DATA_DIR isolation is a QA runner guard, not a product acceptance criterion unless this issue directly changes runtime data path handling. If the assigned preview port is available and browser validation can proceed safely, do not fail this PR solely because the PR branch does not include a later Taskix DATA_DIR infrastructure fix. Mention the limitation in findings or untested areas, then continue validating the PR-scoped behavior.
-- Do not modify the current Taskix app checkout or its .git directory.
+- Do not modify the main Taskix app checkout or its .git directory.
 - The current working directory is the isolated QA clone for this PR: ${workspaceDir}.
-- Run git, npm, and browser validation commands only in the current working directory unless explicitly inspecting GitHub with gh.
+- Run git, npm, and browser validation commands only in the isolated QA clone unless explicitly inspecting GitHub with gh. It is acceptable to modify the isolated QA clone's git checkout state to reach the expected PR head.
 
 Return JSON with passed, failureType, summary, findings, labelsApplied, testsRun.`;
     const result = await this.runJsonResult<QaPrReviewResult>(prompt, schema, { cwd: workspaceDir });
