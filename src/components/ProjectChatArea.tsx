@@ -216,6 +216,7 @@ function RunningAgentMessages({ jobs, sessions, workflows }: { jobs: JobRecord[]
         const label = runningAgentLabel(job, session);
         const issueLabel = runningJobIssueLabel(job, session, workflows);
         const startedAt = job.runtime?.startedAt ?? job.updatedAt ?? job.createdAt;
+        const elapsed = formatElapsed(startedAt);
         const outputTail = job.runtime?.outputTail?.trimEnd();
         return (
           <div key={job.jobId} className="chat-message assistant pending" aria-live="polite">
@@ -226,13 +227,13 @@ function RunningAgentMessages({ jobs, sessions, workflows }: { jobs: JobRecord[]
                   <Badge variant="light">{label}</Badge>
                   {issueLabel ? <Badge size="xs" variant="outline">{issueLabel}</Badge> : null}
                 </Group>
-                <Text component="time" dateTime={new Date().toISOString()} size="xs" c="dimmed">
-                  {formatElapsed(startedAt)}
+                <Text component="time" dateTime={new Date().toISOString()} size="xs" c="dimmed" title={`Running for ${elapsed}`}>
+                  {elapsed}
                 </Text>
               </Group>
               <Text size="sm" c="dimmed" className="running-agent-line">
                 <LoaderCircle size={13} className="chat-composer-spinner" />
-                <span>{label} working{issueLabel ? ` on ${issueLabel}` : ""}...</span>
+                <span>{label} working{issueLabel ? ` on ${issueLabel}` : ""}...({elapsed})</span>
               </Text>
               {outputTail ? (
                 <RunningAgentLog label={label} output={outputTail} />
