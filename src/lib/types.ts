@@ -246,6 +246,8 @@ export type JobRecord = {
     branch?: string | null;
     headSha?: string | null;
     qaAttempt?: number | null;
+    previewPort?: number | null;
+    previewUrl?: string | null;
     returnedFromQa?: boolean | null;
     previousPrUrl?: string | null;
     sessionKey?: string | null;

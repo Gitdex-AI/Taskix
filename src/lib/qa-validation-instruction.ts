@@ -1,7 +1,8 @@
 export function qaValidationInstruction(
   prUrl: string,
   issue: { githubIssueNumber?: number | null; title: string },
-  headSha?: string | null
+  headSha?: string | null,
+  previewUrl = "http://127.0.0.1:8001"
 ): string {
   const issueNumber = issue.githubIssueNumber ? `#${issue.githubIssueNumber}` : "the source issue";
   return [
@@ -16,7 +17,8 @@ export function qaValidationInstruction(
     "- npm run build",
     "",
     "Focused manual QA:",
-    "- Use an isolated DATA_DIR under /private/tmp and run the QA worktree on http://127.0.0.1:8001.",
+    `- Use an isolated DATA_DIR under /private/tmp and run the QA worktree on ${previewUrl}.`,
+    `- If you start Next dev manually, bind to the assigned preview URL, for example: DATA_DIR=/private/tmp/taskix-qa-${issue.githubIssueNumber ?? "issue"}-dev-data ./node_modules/.bin/next dev -H 127.0.0.1 -p ${new URL(previewUrl).port}.`,
     "- Verify first-run setup, initialized login protection, protected internal APIs, version label, self-update failure handling, restart confirmation, restart polling, and page restoration end to end.",
     "- Record pages visited, controls clicked, observed results, and any environment limits."
   ].join("\n");

@@ -174,7 +174,7 @@ export async function runWorkflowIssue(workflowId: string, issueId: string, proj
   return workflow;
 }
 
-export async function runWorkflowQa(workflowId: string, issueId: string, project?: ProjectRecord | null, qaContext: { prUrl?: string | null; headSha?: string | null; qaAttempt?: number | null } = {}): Promise<WorkflowRecord> {
+export async function runWorkflowQa(workflowId: string, issueId: string, project?: ProjectRecord | null, qaContext: { prUrl?: string | null; headSha?: string | null; qaAttempt?: number | null; previewUrl?: string | null } = {}): Promise<WorkflowRecord> {
   const settings = await getSettings();
   const codex = new CodexClient(settings);
   const workflow = await getWorkflow(workflowId);
@@ -191,7 +191,7 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
 
   const issueOwnedPaths = issue.ownedPaths ?? [];
   const qaStartedAt = new Date().toISOString();
-  const qaInstruction = qaValidationInstruction(qaPrUrl, issue, qaHeadSha);
+  const qaInstruction = qaValidationInstruction(qaPrUrl, issue, qaHeadSha, qaContext.previewUrl ?? undefined);
   if (workflow.projectId) {
     const existingQaSession = await getAgentSession(issue.qaSessionId ?? `${issue.issueId}:qa`);
     await appendAgentMessages({
@@ -219,7 +219,8 @@ export async function runWorkflowQa(workflowId: string, issueId: string, project
     repo: project.githubRepo,
     issueNumber: issue.githubIssueNumber,
     prUrl: qaPrUrl,
-    headSha: qaHeadSha
+    headSha: qaHeadSha,
+    previewUrl: qaContext.previewUrl ?? null
   });
   const qaFinishedAt = new Date().toISOString();
   const qaFailureType = qaResult.passed ? "none" : qaResult.failureType;

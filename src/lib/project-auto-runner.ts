@@ -4,6 +4,7 @@ import { canAutoRunDeveloper, canAutoRunQa, isClosedIssue } from "@/lib/auto-run
 import { addLabelsWithGh, commentIssueWithGh, getPullRequestHeadShaWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { findDependencyIssue, isDependencySatisfied } from "@/lib/issue-dependencies";
 import { syncWorkflowFromGitHub } from "@/lib/orchestrator";
+import { allocateQaPreviewPort, qaPreviewUrl } from "@/lib/qa-preview-port";
 import { cancelPendingJobs, createJob, listAgentSessions, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord, JobType, ProjectRecord, WorkflowRecord } from "@/lib/types";
 
@@ -261,6 +262,8 @@ async function ensureQaJob(project: ProjectRecord, workflow: WorkflowRecord, iss
   if (existing) return existing;
   const headSha = await getPullRequestHeadShaWithGh(project.githubRepo, issue.prUrl);
   const jobs = await listJobs(project.projectId);
+  const previewPort = allocateQaPreviewPort(jobs);
+  const previewUrl = qaPreviewUrl(previewPort);
   const qaAttempt = jobs
     .filter((job) => job.type === "qa_run" && job.payload.workflowId === workflow.workflowId && job.payload.issueId === issue.issueId)
     .map((job) => job.payload.qaAttempt ?? 0)
@@ -275,7 +278,7 @@ async function ensureQaJob(project: ProjectRecord, workflow: WorkflowRecord, iss
   return createJob({
     projectId: project.projectId,
     type: "qa_run",
-    payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt }
+    payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt, previewPort, previewUrl }
   });
 }
 

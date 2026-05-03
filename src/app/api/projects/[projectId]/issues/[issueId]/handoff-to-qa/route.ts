@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
 import { addLabelsWithGh, getPullRequestHeadShaWithGh, removeLabelsWithGh } from "@/lib/github-local";
 import { qaValidationInstruction } from "@/lib/orchestrator";
+import { allocateQaPreviewPort, qaPreviewUrl } from "@/lib/qa-preview-port";
 import { appendAgentMessages, cancelPendingJobs, createJob, getProject, listJobs, listProjectWorkflows, saveWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
@@ -32,7 +33,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
       action: "Check GitHub connectivity and retry Handoff to QA. No QA job was queued."
     }, { status: 502 });
   }
-  const qaAttempt = nextQaAttempt(await listJobs(project.projectId), workflow.workflowId, issue.issueId);
+  const jobs = await listJobs(project.projectId);
+  const qaAttempt = nextQaAttempt(jobs, workflow.workflowId, issue.issueId);
+  const previewPort = allocateQaPreviewPort(jobs);
+  const previewUrl = qaPreviewUrl(previewPort);
   const issueLabelsToRemove = labelsToRemove(issue.labels ?? []);
   const prLabelsToRemove = labelsToRemove(issue.prLabels ?? []);
   try {
@@ -66,7 +70,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   await saveWorkflow(workflow);
 
   const sessionKey = issue.qaSessionId ?? `${issue.issueId}:qa`;
-  const qaInstruction = qaValidationInstruction(issue.prUrl, issue, headSha);
+  const qaInstruction = qaValidationInstruction(issue.prUrl, issue, headSha, previewUrl);
   const startedAt = new Date().toISOString();
   await appendAgentMessages({
     sessionKey,
@@ -104,7 +108,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   const job = existingJob ?? await createJob({
     projectId: project.projectId,
     type: "qa_run",
-    payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt }
+    payload: { workflowId: workflow.workflowId, issueId: issue.issueId, prUrl: issue.prUrl, branch: issue.branch ?? null, headSha, qaAttempt, previewPort, previewUrl }
   });
   await appendAgentRunPlaceholder({
     project,

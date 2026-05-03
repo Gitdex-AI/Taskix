@@ -62,7 +62,8 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
         await runWorkflowQa(job.payload.workflowId, job.payload.issueId, project, {
           prUrl: job.payload.prUrl ?? null,
           headSha: job.payload.headSha ?? null,
-          qaAttempt: job.payload.qaAttempt ?? null
+          qaAttempt: job.payload.qaAttempt ?? null,
+          previewUrl: job.payload.previewUrl ?? null
         });
       } else if (job.type === "architect_review_run" && job.payload.issueId) {
         await runWorkflowArchitectReview(job.payload.workflowId, job.payload.issueId, project);
@@ -154,7 +155,7 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
   if (job.type === "qa_run" && issue) {
     const sessionKey = issue.qaSessionId ?? `${issue.issueId}:qa`;
     const prUrl = job.payload.prUrl ?? issue.prUrl ?? "";
-    const instruction = qaValidationInstruction(prUrl, issue, job.payload.headSha ?? null);
+    const instruction = qaValidationInstruction(prUrl, issue, job.payload.headSha ?? null, job.payload.previewUrl ?? undefined);
     await appendRunUserInstruction({
       project,
       workflow,
