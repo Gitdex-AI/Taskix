@@ -2,6 +2,7 @@ import { Alert, Anchor, Badge, Button, Group, Paper, SimpleGrid, Stack, Text, Th
 import { AlertCircle, ArrowLeft, ExternalLink, GitBranch, GitPullRequest, Inbox, ListTodo, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import { notFound } from "next/navigation";
 import { ProjectGitHubTriageRefreshButton } from "@/components/ProjectGitHubTriageRefreshButton";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getProjectTriageWithGh } from "@/lib/github-local";
 import { getProject } from "@/lib/store";
 import type { ProjectTriageGroup, ProjectTriageItem, ProjectTriageResponse } from "@/lib/types";
@@ -58,6 +59,7 @@ export default async function ProjectGitHubTriagePage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = await params;
+  await requireConsolePageAuth(`/projects/${projectId}/github-triage`);
   const project = await getProject(projectId);
   if (!project) notFound();
 

@@ -2,12 +2,14 @@ import { Badge, Card, Grid, Group, Paper, SimpleGrid, Text, ThemeIcon } from "@m
 import { Bot, FolderKanban, GitBranch, Workflow } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
 import { WorkflowsTable } from "@/components/Tables";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getSettings } from "@/lib/settings";
 import { listProjects, listWorkflows } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  await requireConsolePageAuth("/");
   const [settings, projects, workflows] = await Promise.all([getSettings(), listProjects(), listWorkflows()]);
 
   return (

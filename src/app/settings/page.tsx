@@ -1,10 +1,13 @@
 import { Alert, Badge, Button, Checkbox, Code, Group, NumberInput, Paper, PasswordInput, SimpleGrid, Text, TextInput, Textarea } from "@mantine/core";
 import { GitBranch, Info, KeyRound, Save, Trash2, Webhook, Wrench } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
+import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getSettings } from "@/lib/settings";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ message?: string; error?: string }> }) {
-  const [{ message, error }, settings] = await Promise.all([searchParams, getSettings()]);
+  const { message, error } = await searchParams;
+  await requireConsolePageAuth(buildSettingsNextPath({ message, error }));
+  const settings = await getSettings();
   const hasGitHubKey = Boolean(settings.githubUsername && settings.githubSshPrivateKeyPath && settings.githubSshPublicKey);
 
   return (
@@ -135,4 +138,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       </Paper>
     </>
   );
+}
+
+function buildSettingsNextPath({ message, error }: { message?: string; error?: string }): string {
+  const params = new URLSearchParams();
+  if (message) params.set("message", message);
+  if (error) params.set("error", error);
+  const query = params.toString();
+  return query ? `/settings?${query}` : "/settings";
 }
