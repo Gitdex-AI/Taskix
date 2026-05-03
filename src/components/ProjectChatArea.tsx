@@ -291,6 +291,27 @@ function messageJobElapsed(message: TimelineMessage, jobs: JobRecord[]): string 
   return formatElapsed(startedAt);
 }
 
+function isLiveMessage(message: TimelineMessage): boolean {
+  return message.status === "running" || message.status === "pending";
+}
+
+function isMessageActivelyRunning(message: TimelineMessage, jobs: JobRecord[]): boolean {
+  if (!isLiveMessage(message)) return false;
+  const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
+  return !job?.runtime?.agentFinalAt;
+}
+
+function messageDisplayContent(message: TimelineMessage, jobs: JobRecord[]): string {
+  if (!isLiveMessage(message)) return message.content;
+  const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
+  if (job?.runtime?.agentFinalAt) {
+    const status = job.runtime.agentFinalStatus ? ` (${job.runtime.agentFinalStatus})` : "";
+    const summary = job.runtime.agentFinalSummary ? `: ${job.runtime.agentFinalSummary}` : "";
+    return `Agent final received${status}${summary}`;
+  }
+  return `${message.content}(${messageJobElapsed(message, jobs)})`;
+}
+
 function canResolveMessageJob(message: TimelineMessage, jobs: JobRecord[]): message is TimelineMessage & { jobId: string } {
   if (message.role !== "assistant" || !message.jobId || (message.status !== "running" && message.status !== "pending")) return false;
   const job = jobs.find((item) => item.jobId === message.jobId);
@@ -457,11 +478,11 @@ function MessageList({
                     </Text>
                   </Group>
                 </Group>
-                <Text size="sm" c={message.status === "running" || message.status === "pending" ? "dimmed" : undefined} className={message.status === "running" || message.status === "pending" ? "running-agent-line" : undefined} style={{ whiteSpace: "pre-wrap" }}>
-                  {(message.status === "running" || message.status === "pending") ? <LoaderCircle size={13} className="chat-composer-spinner" /> : null}
-                  <span>{message.content}{message.status === "running" || message.status === "pending" ? `(${messageJobElapsed(message, jobs)})` : ""}</span>
+                <Text size="sm" c={isLiveMessage(message) ? "dimmed" : undefined} className={isLiveMessage(message) ? "running-agent-line" : undefined} style={{ whiteSpace: "pre-wrap" }}>
+                  {isMessageActivelyRunning(message, jobs) ? <LoaderCircle size={13} className="chat-composer-spinner" /> : null}
+                  <span>{messageDisplayContent(message, jobs)}</span>
                 </Text>
-                {(message.status === "running" || message.status === "pending") ? <MessageLiveOutput message={message} jobs={jobs} /> : null}
+                {isMessageActivelyRunning(message, jobs) ? <MessageLiveOutput message={message} jobs={jobs} /> : null}
                 {message.executionLogs?.length ? <InlineExecutionLogs logs={message.executionLogs} /> : null}
               </div>
             </div>

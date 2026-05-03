@@ -207,6 +207,24 @@ export async function touchJobRuntime(jobId: string, input: { pid?: number | nul
   await saveJob(job);
 }
 
+export async function recordJobAgentFinal(jobId: string, final: {
+  status: "pass" | "fail" | "blocked";
+  summary?: string | null;
+}): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job || job.status !== "running") return;
+  const now = new Date().toISOString();
+  job.runtime = {
+    ...(job.runtime ?? {}),
+    lastHeartbeatAt: now,
+    agentFinalAt: job.runtime?.agentFinalAt ?? now,
+    agentFinalStatus: final.status,
+    agentFinalSummary: final.summary?.trim().slice(0, 500) || null
+  };
+  job.updatedAt = now;
+  await saveJob(job);
+}
+
 export async function listJobs(projectId?: string): Promise<JobRecord[]> {
   await recoverStaleRunningJobs(projectId);
   const rows = projectId

@@ -238,6 +238,9 @@ export type JobRecord = {
     outputTail?: string | null;
     outputBytes?: number | null;
     finishedAt?: string | null;
+    agentFinalAt?: string | null;
+    agentFinalStatus?: "pass" | "fail" | "blocked" | null;
+    agentFinalSummary?: string | null;
   };
   payload: {
     workflowId: string;

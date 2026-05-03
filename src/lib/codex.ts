@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { developerRoleIds, developerRoleProfile, formatDeveloperRoleCatalog } from "@/lib/developer-roles";
 import { expectedDeveloperBaseBranch } from "@/lib/issue-run-policy";
 import { getActiveJobId } from "@/lib/job-runtime";
-import { touchJobRuntime } from "@/lib/store";
+import { recordJobAgentFinal, touchJobRuntime } from "@/lib/store";
 import type { ArchitectPrReviewResult, ArchitectReviewResult, DeveloperIssueResult, DeveloperResult, IssueSpec, QaPrReviewResult, QaResult } from "@/lib/types";
 import { dataDir, rootDir } from "@/lib/paths";
 import type { Settings } from "@/lib/types";
@@ -34,6 +34,16 @@ type DeveloperWorktreeFacts = {
 const execFileAsync = promisify(execFile);
 const codexTimeoutMs = 10 * 60 * 1000;
 const ansiPattern = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+const agentFinalInstruction = `
+
+Agent completion protocol:
+- As the final visible output before exiting, print this exact block to stdout:
+TASKIX_AGENT_FINAL
+status: pass|fail|blocked
+summary: one concise sentence describing the final outcome
+TASKIX_AGENT_FINAL_END
+- Use status "pass" when your assigned task completed successfully, "fail" for implementation/test/review failures, and "blocked" for environment, permissions, missing specification, or user-decision blockers.
+- Do not put this block inside JSON output files or markdown fences.`;
 
 function normalizeRuntimeOutput(chunk: Buffer | string): string {
   return String(chunk).replace(ansiPattern, "");
@@ -798,7 +808,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
       schemaPath,
       "-o",
       outputPath,
-      prompt
+      withAgentFinalInstruction(prompt)
     ], { cwd: options.cwd });
     const executionLog = formatCodexExecutionLog(result.stdout, result.stderr);
     if (!result.ok) return { value: null, error: result.stderr.trim() || "Codex exited with a non-zero status.", executionLog };
@@ -813,8 +823,8 @@ Summarize code review outcome, merge readiness, and deployment status according 
     const tmp = await this.tmpDir();
     const outputPath = path.join(tmp, "output.txt");
     const args = sessionId
-      ? ["resume", "--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, sessionId, prompt]
-      : ["--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, prompt];
+      ? ["resume", "--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, sessionId, withAgentFinalInstruction(prompt)]
+      : ["--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, withAgentFinalInstruction(prompt)];
     const result = await this.runCodex(args, { cwd: options.cwd });
     if (!result.ok) return null;
     try {
@@ -835,6 +845,8 @@ Summarize code review outcome, merge readiness, and deployment status according 
       });
       let stdout = "";
       let stderr = "";
+      let finalBuffer = "";
+      let finalRecorded = false;
       let settled = false;
       const activeJobId = getActiveJobId();
       if (activeJobId) void touchJobRuntime(activeJobId, { pid: child.pid ?? null });
@@ -848,11 +860,27 @@ Summarize code review outcome, merge readiness, and deployment status according 
         const text = normalizeRuntimeOutput(chunk);
         stdout += text;
         if (activeJobId) void touchJobRuntime(activeJobId, { output: true, outputChunk: text });
+        if (activeJobId && !finalRecorded) {
+          finalBuffer = `${finalBuffer}${text}`.slice(-4000);
+          const final = parseAgentFinal(finalBuffer);
+          if (final) {
+            finalRecorded = true;
+            void recordJobAgentFinal(activeJobId, final);
+          }
+        }
       });
       child.stderr.on("data", (chunk) => {
         const text = normalizeRuntimeOutput(chunk);
         stderr += text;
         if (activeJobId) void touchJobRuntime(activeJobId, { output: true, outputChunk: text });
+        if (activeJobId && !finalRecorded) {
+          finalBuffer = `${finalBuffer}${text}`.slice(-4000);
+          const final = parseAgentFinal(finalBuffer);
+          if (final) {
+            finalRecorded = true;
+            void recordJobAgentFinal(activeJobId, final);
+          }
+        }
       });
       child.on("error", () => {
         if (settled) return;
@@ -1011,6 +1039,24 @@ function formatCodexExecutionLog(stdout: string, stderr: string): string {
     stderr.trim() ? `stderr\n${stderr.trim()}` : ""
   ].filter(Boolean);
   return sections.join("\n\n");
+}
+
+function withAgentFinalInstruction(prompt: string): string {
+  return `${prompt}${agentFinalInstruction}`;
+}
+
+function parseAgentFinal(output: string): { status: "pass" | "fail" | "blocked"; summary: string | null } | null {
+  const match = output.match(/TASKIX_AGENT_FINAL\s+([\s\S]*?)\s+TASKIX_AGENT_FINAL_END/);
+  if (!match) return null;
+  const fields = new Map<string, string>();
+  for (const line of match[1].split("\n")) {
+    const separator = line.indexOf(":");
+    if (separator === -1) continue;
+    fields.set(line.slice(0, separator).trim().toLowerCase(), line.slice(separator + 1).trim());
+  }
+  const status = fields.get("status");
+  if (status !== "pass" && status !== "fail" && status !== "blocked") return null;
+  return { status, summary: fields.get("summary") || null };
 }
 
 function codexPermissionArgs(sandbox: string, approvalPolicy: string): string[] {
