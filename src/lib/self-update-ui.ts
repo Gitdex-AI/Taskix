@@ -1,6 +1,15 @@
 import type { SelfUpdateState } from "@/lib/self-update";
 
-export type SelfUpdateDialogPhase = "idle" | "loading" | "updating" | "restarting" | "polling" | "success" | "failure" | "timeout";
+export type SelfUpdateDialogPhase =
+  | "idle"
+  | "loading"
+  | "confirm-restart"
+  | "updating"
+  | "restarting"
+  | "polling"
+  | "success"
+  | "failure"
+  | "timeout";
 
 export type SelfUpdateDialogModel = {
   phase: SelfUpdateDialogPhase;
@@ -8,6 +17,8 @@ export type SelfUpdateDialogModel = {
   message: string;
   actionDisabled: boolean;
   canSubmit: boolean;
+  canCancelRestart: boolean;
+  canConfirmRestart: boolean;
   shouldPoll: boolean;
 };
 
@@ -43,6 +54,8 @@ export function deriveSelfUpdateDialogModel(input: {
   const operatorSubmissionAvailable = input.status?.operatorSubmissionAvailable ?? false;
   const restartAvailable = input.status?.restartAvailable ?? false;
   const canSubmit = enabled && !actionDisabled && (restartAvailable || operatorSubmissionAvailable);
+  const canConfirmRestart = enabled && !actionDisabled && input.phase === "confirm-restart" && restartAvailable;
+  const canCancelRestart = input.phase === "confirm-restart" && !actionDisabled;
   const unavailableReason = !enabled
     ? "Self-update is disabled. Set TASKIX_ENABLE_SELF_UPDATE=true on the Taskix server to enable it."
     : !operatorSubmissionAvailable && !restartAvailable
@@ -57,6 +70,8 @@ export function deriveSelfUpdateDialogModel(input: {
     message,
     actionDisabled,
     canSubmit,
+    canCancelRestart,
+    canConfirmRestart,
     shouldPoll: input.phase === "polling"
   };
 }
@@ -70,19 +85,19 @@ export function deriveSelfUpdatePollDecision(input: SelfUpdatePollInput): SelfUp
     };
   }
 
-  if (input.elapsedMs >= input.timeoutMs) {
-    return {
-      phase: "timeout",
-      shouldContinue: false,
-      message: "Restart polling timed out before Taskix reported ready."
-    };
-  }
-
   if (input.responseOk && input.status && input.initialBootId && input.status.bootId !== input.initialBootId) {
     return {
       phase: "success",
       shouldContinue: false,
       message: "Taskix reported a new boot marker after the restart request."
+    };
+  }
+
+  if (input.elapsedMs >= input.timeoutMs) {
+    return {
+      phase: "timeout",
+      shouldContinue: false,
+      message: "Restart polling timed out before Taskix reported ready."
     };
   }
 
@@ -99,6 +114,8 @@ function phaseMessage(phase: SelfUpdateDialogPhase, status: SelfUpdateState | nu
   switch (phase) {
     case "loading":
       return "Checking self-update status.";
+    case "confirm-restart":
+      return "Confirm restart to apply the completed self-update. Cancel keeps Taskix running without requesting restart.";
     case "updating":
       return "Running git pull, npm install, and production build.";
     case "restarting":

@@ -23,6 +23,7 @@ export function SelfUpdateDialog({ version }: { version: string }) {
   const preRestartBootId = useRef<string | null>(null);
 
   const model = useMemo(() => deriveSelfUpdateDialogModel({ phase, status, error }), [phase, status, error]);
+  const canClose = !model.actionDisabled;
 
   useEffect(() => {
     if (!opened) return;
@@ -116,11 +117,20 @@ export function SelfUpdateDialog({ version }: { version: string }) {
     }
   }
 
-  async function startRestart() {
-    if (!window.confirm("Restart Taskix now?")) {
-      return;
-    }
+  function requestRestartConfirmation() {
+    if (!status?.restartAvailable || model.actionDisabled) return;
+    setError("");
+    setPhase("confirm-restart");
+  }
 
+  function cancelRestartConfirmation() {
+    if (!model.canCancelRestart) return;
+    setError("");
+    setPhase("idle");
+  }
+
+  async function confirmRestart() {
+    if (!model.canConfirmRestart) return;
     setError("");
     setPhase("restarting");
     try {
@@ -144,7 +154,18 @@ export function SelfUpdateDialog({ version }: { version: string }) {
       <button className="topbar-version" type="button" aria-label={`Taskix version ${version}. Open self-update dialog`} onClick={() => setOpened(true)}>
         v{version}
       </button>
-      <Modal opened={opened} onClose={() => setOpened(false)} title="Taskix self-update" centered size="lg">
+      <Modal
+        opened={opened}
+        onClose={() => {
+          if (canClose) setOpened(false);
+        }}
+        title="Taskix self-update"
+        centered
+        size="lg"
+        closeOnClickOutside={canClose}
+        closeOnEscape={canClose}
+        withCloseButton={canClose}
+      >
         <Stack gap="md">
           <Group justify="space-between" align="flex-start" gap="sm">
             <Stack gap={2}>
@@ -180,18 +201,35 @@ export function SelfUpdateDialog({ version }: { version: string }) {
           ) : null}
 
           <Group justify="flex-end">
-            <Button type="button" variant="default" onClick={() => setOpened(false)}>
+            <Button type="button" variant="default" disabled={!canClose} onClick={() => setOpened(false)}>
               Close
             </Button>
-            <Button
-              type="button"
-              leftSection={model.shouldPoll ? <RotateCcw size={16} /> : <RefreshCw size={16} />}
-              loading={model.actionDisabled}
-              disabled={!model.canSubmit}
-              onClick={status?.restartAvailable ? startRestart : startUpdate}
-            >
-              {status?.restartAvailable ? "Restart Taskix" : "Update Taskix"}
-            </Button>
+            {phase === "confirm-restart" ? (
+              <>
+                <Button type="button" variant="default" disabled={!model.canCancelRestart} onClick={cancelRestartConfirmation}>
+                  Cancel restart
+                </Button>
+                <Button
+                  type="button"
+                  color="red"
+                  leftSection={<RotateCcw size={16} />}
+                  disabled={!model.canConfirmRestart}
+                  onClick={confirmRestart}
+                >
+                  Confirm restart
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                leftSection={model.shouldPoll ? <RotateCcw size={16} /> : <RefreshCw size={16} />}
+                loading={model.actionDisabled}
+                disabled={!model.canSubmit}
+                onClick={status?.restartAvailable ? requestRestartConfirmation : startUpdate}
+              >
+                {status?.restartAvailable ? "Restart Taskix" : "Update Taskix"}
+              </Button>
+            )}
           </Group>
         </Stack>
       </Modal>
