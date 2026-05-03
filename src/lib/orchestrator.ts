@@ -602,7 +602,7 @@ async function runIssue(issue: IssueRecord, workflow: WorkflowRecord, codex: Cod
   }
 
   const developerCompletionCleanupLabels = ["taskix:planned", "taskix:dev-running", "taskix:pr-opened", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:architect-review", "taskix:ready-to-merge", "taskix:blocked"];
-  const developerCompletionLabels = ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : "role:general_developer"];
+  const developerCompletionLabels = ["taskix:need-qa", issue.developerRole ? `role:${issue.developerRole}` : "role:general_developer"];
   issue.labels = [...new Set([...(issue.labels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), ...developerCompletionLabels])];
   issue.prLabels = [...new Set([...(issue.prLabels ?? []).filter((label) => !developerCompletionCleanupLabels.includes(label.toLowerCase())), ...developerCompletionLabels])];
   timeline.push(`Developer completed PR for issue ${issue.issueId}. Awaiting QA handoff.`);
@@ -790,8 +790,8 @@ async function maybeRebuildEnvironmentBlockedWorktree(input: {
 }
 
 async function publishDeveloperPrStateToGitHub(repo: string, issue: IssueRecord, prUrl: string): Promise<void> {
-  const labelsToApply = ["taskix:architect-review", issue.developerRole ? `role:${issue.developerRole}` : ""].filter((label): label is string => Boolean(label));
-  const labelsToClear = ["taskix:planned", "taskix:dev-running", "taskix:pr-opened", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:ready-to-merge", "taskix:blocked"];
+  const labelsToApply = ["taskix:need-qa", issue.developerRole ? `role:${issue.developerRole}` : ""].filter((label): label is string => Boolean(label));
+  const labelsToClear = ["taskix:planned", "taskix:dev-running", "taskix:pr-opened", "qa-passed", "taskix:qa-passed", "qa-failed", "taskix:qa-failed", "taskix:spec-blocked", "taskix:architect-review", "taskix:ready-to-merge", "taskix:blocked"];
   if (issue.githubIssueNumber) {
     await removeLabelsWithGh(repo, issue.githubIssueNumber, labelsToRemove(issue.labels ?? [], labelsToClear, labelsToApply));
     await addLabelsWithGh(repo, issue.githubIssueNumber, labelsToApply);
