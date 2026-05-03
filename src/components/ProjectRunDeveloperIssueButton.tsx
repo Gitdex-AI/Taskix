@@ -24,30 +24,33 @@ export function ProjectRunDeveloperIssueButton({
       const payload = await response.json() as { error?: string; jobId?: string };
       if (!response.ok) {
         setError(payload.error ?? "Run Dev failed");
+        setPending(false);
         return;
       }
-      if (payload.jobId) runQueuedJob(payload.jobId);
+      if (payload.jobId) await runQueuedJob(payload.jobId);
       router.refresh();
+      if (!payload.jobId) setPending(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Run Dev failed");
-    } finally {
       setPending(false);
     }
   }
 
-  function runQueuedJob(jobId: string) {
-    void fetch(`/api/projects/${projectId}/jobs/${jobId}/run`, { method: "POST" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await response.text());
-      })
-      .catch((caught: unknown) => {
-        const message = caught instanceof Error ? caught.message : "Run Dev failed";
-        if (!message.includes("not pending")) setError(message);
-      })
-      .finally(() => {
-        router.refresh();
-      });
+  async function runQueuedJob(jobId: string) {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/jobs/${jobId}/run`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+    } catch (caught: unknown) {
+      const message = caught instanceof Error ? caught.message : "Run Dev failed";
+      if (!message.includes("not pending")) {
+        setError(message);
+        setPending(false);
+      }
+    } finally {
+      router.refresh();
+    }
     window.setTimeout(() => router.refresh(), 500);
+    window.setTimeout(() => setPending(false), 1800);
   }
 
   return (
