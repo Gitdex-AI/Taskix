@@ -357,14 +357,14 @@ function isMessageActivelyRunning(message: TimelineMessage, jobs: JobRecord[]): 
 }
 
 function messageDisplayContent(message: TimelineMessage, jobs: JobRecord[]): string {
-  if (!isLiveMessage(message)) return message.content;
+  if (!isLiveMessage(message)) return stripAgentFinalBlocks(message.content);
   const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
   if (job?.runtime?.agentFinalAt) {
     const status = job.runtime.agentFinalStatus ? ` (${job.runtime.agentFinalStatus})` : "";
     const summary = job.runtime.agentFinalSummary ? `: ${job.runtime.agentFinalSummary}` : "";
     return `Agent final received${status}${summary}`;
   }
-  return `${message.content}(${messageJobElapsed(message, jobs)})`;
+  return `${stripAgentFinalBlocks(message.content)}(${messageJobElapsed(message, jobs)})`;
 }
 
 function canResolveMessageJob(message: TimelineMessage, jobs: JobRecord[]): message is TimelineMessage & { jobId: string } {
