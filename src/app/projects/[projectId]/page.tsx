@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { ActionIcon, Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
-import { Archive, FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
+import { Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
+import { FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueAction";
 import { ProjectAutoRunIssuesButton } from "@/components/ProjectAutoRunIssuesButton";
@@ -398,7 +398,6 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
                 runningLabel={activeAutoRunLabel(jobs, [workflow])}
               />
             ) : null}
-            {active ? <ArchiveRequirementForm projectId={projectId} workflowId={workflow.workflowId} /> : null}
           </Group>
         </div>
         {active ? (
@@ -426,16 +425,6 @@ function DiscardDraftRequirementForm({ projectId, workflowId }: { projectId: str
           Discard
         </Button>
       </Group>
-    </form>
-  );
-}
-
-function ArchiveRequirementForm({ projectId, workflowId }: { projectId: string; workflowId: string }) {
-  return (
-    <form method="post" action={`/api/projects/${projectId}/requirements/${workflowId}/archive`}>
-      <ActionIcon type="submit" variant="light" color="red" size="sm" radius="xl" title="Archive requirement" aria-label="Archive requirement">
-        <Archive size={14} />
-      </ActionIcon>
     </form>
   );
 }
