@@ -68,6 +68,10 @@
   border-color: var(--app-border);
 }
 
+:global(html[data-theme="dark"] .auth-form button) {
+  color: var(--app-filled-control-text);
+}
+
 :global(html[data-theme="dark"] .project-switcher-trigger.sidebar) {
   color: var(--app-ink);
 }
