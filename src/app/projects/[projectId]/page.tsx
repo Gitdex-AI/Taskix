@@ -330,18 +330,28 @@ function ProjectWorkspaceSidebar(input: {
               <ProjectSwitcher projects={input.switcherProjects} variant="sidebar" />
               <Text size="xs" c="dimmed" lineClamp={1}>{project.githubRepo}</Text>
             </div>
-            <ProjectDetailPanel
-              project={{
-                projectId: project.projectId,
-                slug: project.slug,
-                githubRepo: project.githubRepo,
-                autoDeploy: project.autoDeploy,
-                agentsFilePath: project.agentsFilePath,
-                updateAgentsFile: project.updateAgentsFile,
-                projectManagerSessionId: project.projectManagerSessionId,
-                devopsSessionId: project.devopsSessionId
-              }}
-            />
+            <Group gap={4} wrap="nowrap">
+              <Link
+                href={`/projects/${project.projectId}/github-triage`}
+                className="sidebar-icon-link"
+                title="GitHub triage"
+                aria-label="GitHub triage"
+              >
+                <ListTodo size={16} />
+              </Link>
+              <ProjectDetailPanel
+                project={{
+                  projectId: project.projectId,
+                  slug: project.slug,
+                  githubRepo: project.githubRepo,
+                  autoDeploy: project.autoDeploy,
+                  agentsFilePath: project.agentsFilePath,
+                  updateAgentsFile: project.updateAgentsFile,
+                  projectManagerSessionId: project.projectManagerSessionId,
+                  devopsSessionId: project.devopsSessionId
+                }}
+              />
+            </Group>
           </Group>
           <form method="post" action={`/api/projects/${project.projectId}/requirements/draft`}>
             <Button
@@ -402,14 +412,6 @@ function ProjectWorkspaceSidebar(input: {
               data-nav-action={toolsPanelAction.action}
             >
               <Wrench size={16} />
-            </Link>
-            <Link
-              href={`/projects/${project.projectId}/github-triage`}
-              className="sidebar-icon-link"
-              title="GitHub triage"
-              aria-label="GitHub triage"
-            >
-              <ListTodo size={16} />
             </Link>
             <Link
               href={settingsPanelAction.href}
