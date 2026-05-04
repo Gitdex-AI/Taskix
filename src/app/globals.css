@@ -605,22 +605,25 @@ body.workspace-mode-body .topbar {
 }
 
 .requirement-tree-topline {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  display: flex;
   gap: 8px;
-  align-items: start;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .requirement-tree-main-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   color: inherit;
   text-decoration: none;
 }
 
 .requirement-tree-main-link .mantine-Badge-root {
+  flex: 0 0 auto;
   font-size: 10px;
   height: 18px;
-  margin-top: 2px;
   padding: 0 6px;
   text-transform: none;
 }

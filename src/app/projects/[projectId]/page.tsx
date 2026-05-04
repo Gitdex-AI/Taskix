@@ -477,7 +477,7 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
             href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
             className="requirement-tree-summary-link"
           >
-            <Text className="requirement-tree-summary" size="sm" c="dimmed" lineClamp={2}>{workflow.userRequirement}</Text>
+            <Text className="requirement-tree-summary" size="sm" c="dimmed" lineClamp={3}>{workflow.userRequirement}</Text>
           </a>
         </div>
         {active ? (
