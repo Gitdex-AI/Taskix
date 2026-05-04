@@ -452,30 +452,33 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
     return (
       <div key={workflow.workflowId} className={`requirement-tree-item${active ? " active" : ""}`}>
         <div className="requirement-tree-link">
+          <div className="requirement-tree-topline">
+            <a
+              href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
+              className="requirement-tree-main-link"
+            >
+              <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
+              <Badge size="xs" color={status.color} variant="light">{status.label}</Badge>
+            </a>
+            <Group gap={6} justify="flex-end" wrap="nowrap">
+              {planningAction}
+              {active && !planningAction && workflow.issues.length ? (
+                <ProjectAutoRunIssuesButton
+                  projectId={projectId}
+                  workflowIds={[workflow.workflowId]}
+                  issueIds={workflow.issues.map((issue) => issue.issueId)}
+                  initialState={autoRunState}
+                  runningLabel={activeAutoRunLabel(jobs, [workflow])}
+                />
+              ) : null}
+            </Group>
+          </div>
           <a
             href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
-            className="requirement-tree-main-link"
+            className="requirement-tree-summary-link"
           >
-            <div className="workflow-switch-main">
-              <Group gap={6} wrap="nowrap" align="center" className="requirement-tree-title">
-                <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
-                <Badge size="xs" color={status.color} variant="light">{status.label}</Badge>
-              </Group>
-              <Text className="requirement-tree-summary" size="sm" c="dimmed" lineClamp={2}>{workflow.userRequirement}</Text>
-            </div>
+            <Text className="requirement-tree-summary" size="sm" c="dimmed" lineClamp={2}>{workflow.userRequirement}</Text>
           </a>
-          <Group gap={6} justify="flex-end" wrap="nowrap">
-            {planningAction}
-            {active && !planningAction && workflow.issues.length ? (
-              <ProjectAutoRunIssuesButton
-                projectId={projectId}
-                workflowIds={[workflow.workflowId]}
-                issueIds={workflow.issues.map((issue) => issue.issueId)}
-                initialState={autoRunState}
-                runningLabel={activeAutoRunLabel(jobs, [workflow])}
-              />
-            ) : null}
-          </Group>
         </div>
         {active ? (
           <div className="requirement-tree-issues">

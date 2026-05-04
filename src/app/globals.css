@@ -594,10 +594,6 @@ body.workspace-mode-body .topbar {
 }
 
 .requirement-tree-link {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  gap: 8px;
-  align-items: center;
   min-height: 46px;
   padding: 8px 10px;
   color: inherit;
@@ -608,26 +604,35 @@ body.workspace-mode-body .topbar {
   background: #f8fafc;
 }
 
+.requirement-tree-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: start;
+}
+
 .requirement-tree-main-link {
   min-width: 0;
   color: inherit;
   text-decoration: none;
 }
 
-.requirement-tree-title {
-  min-width: 0;
-}
-
-.requirement-tree-title .mantine-Badge-root {
-  flex: 0 0 auto;
+.requirement-tree-main-link .mantine-Badge-root {
   font-size: 10px;
   height: 18px;
+  margin-top: 2px;
   padding: 0 6px;
   text-transform: none;
 }
 
+.requirement-tree-summary-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
 .requirement-tree-summary {
-  margin-top: 4px;
+  margin-top: 8px;
   line-height: 1.35;
 }
 
