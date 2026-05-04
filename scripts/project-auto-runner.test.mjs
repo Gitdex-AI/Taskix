@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { describe, it } from "node:test";
 import { canAutoRunDeveloper, canAutoRunQa } from "../src/lib/auto-run-policy.ts";
-
-const projectAutoRunnerSource = await readFile(new URL("../src/lib/project-auto-runner.ts", import.meta.url), "utf8");
+import { hasSuccessfulDeveloperRetryAfterReturnBlocker, shouldReturnFailedJobToDeveloper } from "../src/lib/auto-run-return-policy.ts";
 
 const issue = (overrides = {}) => ({
   title: "Issue",
@@ -16,6 +14,23 @@ const issue = (overrides = {}) => ({
   prUrl: "https://github.com/Gitdex-AI/gitdex/pull/1",
   labels: [],
   prLabels: [],
+  ...overrides
+});
+
+const workflow = (issueRecord = issue()) => ({
+  workflowId: "workflow-1",
+  projectId: "project-1",
+  issues: [issueRecord]
+});
+
+const job = (overrides = {}) => ({
+  jobId: `job-${Math.random()}`,
+  projectId: "project-1",
+  type: "issue_run",
+  status: "done",
+  createdAt: "2026-05-04T00:00:00.000Z",
+  updatedAt: "2026-05-04T00:00:00.000Z",
+  payload: { workflowId: "workflow-1", issueId: "issue-1" },
   ...overrides
 });
 
@@ -65,10 +80,67 @@ describe("canAutoRunDeveloper", () => {
 
 describe("stale failed return jobs", () => {
   it("ignores failed review or merge jobs once a newer developer retry succeeded", () => {
-    assert.match(
-      projectAutoRunnerSource,
-      /if \(latest && hasSuccessfulDeveloperJobAfter\(issue, workflow, jobs, Date\.parse\(latest\.updatedAt\)\)\) return false;/
-    );
-    assert.match(projectAutoRunnerSource, /job\.type === "issue_run"[\s\S]*job\.status === "done"[\s\S]*Date\.parse\(job\.updatedAt\) > timestamp/);
+    const issueRecord = issue({ labels: ["gd:fix"] });
+    const workflowRecord = workflow(issueRecord);
+    const jobs = [
+      job({
+        jobId: "review-failed",
+        type: "architect_review_run",
+        status: "failed",
+        updatedAt: "2026-05-04T01:00:00.000Z"
+      }),
+      job({
+        jobId: "developer-done",
+        type: "issue_run",
+        status: "done",
+        updatedAt: "2026-05-04T01:05:00.000Z"
+      })
+    ];
+
+    assert.equal(shouldReturnFailedJobToDeveloper(issueRecord, workflowRecord, jobs), false);
+    assert.equal(hasSuccessfulDeveloperRetryAfterReturnBlocker(issueRecord, workflowRecord, jobs), true);
+  });
+
+  it("returns to developer when review failed and no newer developer retry completed", () => {
+    const issueRecord = issue({ labels: ["gd:fix"] });
+    const workflowRecord = workflow(issueRecord);
+    const jobs = [
+      job({
+        jobId: "developer-old",
+        type: "issue_run",
+        status: "done",
+        updatedAt: "2026-05-04T00:55:00.000Z"
+      }),
+      job({
+        jobId: "review-failed",
+        type: "architect_review_run",
+        status: "failed",
+        updatedAt: "2026-05-04T01:00:00.000Z"
+      })
+    ];
+
+    assert.equal(shouldReturnFailedJobToDeveloper(issueRecord, workflowRecord, jobs), true);
+    assert.equal(hasSuccessfulDeveloperRetryAfterReturnBlocker(issueRecord, workflowRecord, jobs), false);
+  });
+
+  it("treats a newer developer retry after failed QA as ready for QA recheck", () => {
+    const issueRecord = issue({ labels: ["gd:fix"] });
+    const workflowRecord = workflow(issueRecord);
+    const jobs = [
+      job({
+        jobId: "qa-failed",
+        type: "qa_run",
+        status: "failed",
+        updatedAt: "2026-05-04T01:00:00.000Z"
+      }),
+      job({
+        jobId: "developer-done",
+        type: "issue_run",
+        status: "done",
+        updatedAt: "2026-05-04T01:05:00.000Z"
+      })
+    ];
+
+    assert.equal(hasSuccessfulDeveloperRetryAfterReturnBlocker(issueRecord, workflowRecord, jobs), true);
   });
 });

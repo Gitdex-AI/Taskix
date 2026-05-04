@@ -1,6 +1,7 @@
 import { runJobById } from "@/lib/job-runner";
 import { shouldCancelAutoRun, shouldPauseAutoRun, startAutoRunState, updateAutoRunState } from "@/lib/auto-run-control";
 import { canAutoRunDeveloper, canAutoRunQa, isClosedIssue } from "@/lib/auto-run-policy";
+import { hasSuccessfulDeveloperRetryAfterReturnBlocker, shouldReturnFailedJobToDeveloper } from "@/lib/auto-run-return-policy";
 import { commentIssueWithGh, getPullRequestHeadShaWithGh } from "@/lib/github-local";
 import { getIssueStage, transitionIssueStage } from "@/lib/issue-stage";
 import { findDependencyIssue, isDependencySatisfied } from "@/lib/issue-dependencies";
@@ -245,38 +246,6 @@ function shouldReturnRebaseToDeveloper(issue: IssueRecord): boolean {
     && !isClosedIssue(issue)
     && issue.prState !== "MERGED"
     && getIssueStage(issue) === "gd:rebase";
-}
-
-export function shouldReturnFailedJobToDeveloper(issue: IssueRecord, workflow: WorkflowRecord, jobs: JobRecord[]): boolean {
-  const latest = latestReturnBlockerJob(issue, workflow, jobs, ["architect_review_run", "merge_run"]);
-  if (latest && hasSuccessfulDeveloperJobAfter(issue, workflow, jobs, Date.parse(latest.updatedAt))) return false;
-  return Boolean(issue.prUrl) && !isClosedIssue(issue) && issue.prState !== "MERGED" && latest?.status === "failed";
-}
-
-export function hasSuccessfulDeveloperRetryAfterReturnBlocker(issue: IssueRecord, workflow: WorkflowRecord, jobs: JobRecord[]): boolean {
-  const latest = latestReturnBlockerJob(issue, workflow, jobs, ["qa_run", "architect_review_run", "merge_run"]);
-  return Boolean(latest && hasSuccessfulDeveloperJobAfter(issue, workflow, jobs, Date.parse(latest.updatedAt)));
-}
-
-function latestReturnBlockerJob(issue: IssueRecord, workflow: WorkflowRecord, jobs: JobRecord[], types: JobRecord["type"][]): JobRecord | null {
-  return jobs
-    .filter((job) => (
-      job.payload.workflowId === workflow.workflowId
-      && job.payload.issueId === issue.issueId
-      && types.includes(job.type)
-      && job.status === "failed"
-    ))
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
-}
-
-function hasSuccessfulDeveloperJobAfter(issue: IssueRecord, workflow: WorkflowRecord, jobs: JobRecord[], timestamp: number): boolean {
-  return jobs.some((job) => (
-    job.payload.workflowId === workflow.workflowId
-    && job.payload.issueId === issue.issueId
-    && job.type === "issue_run"
-    && job.status === "done"
-    && Date.parse(job.updatedAt) > timestamp
-  ));
 }
 
 async function ensureDeveloperJob(project: ProjectRecord, workflow: WorkflowRecord, issue: IssueRecord): Promise<JobRecord> {
