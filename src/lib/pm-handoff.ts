@@ -1,7 +1,7 @@
 import type { AgentSessionRecord } from "@/lib/types";
 
 export type PmHandoffPayload = {
-  status: "ready_for_architect";
+  status: "ready_for_planner";
   requirement: string;
   constraints: string[];
   acceptanceCriteria: string[];
@@ -20,21 +20,21 @@ export type PmStartNewRequirementAction = {
   }>;
 };
 
-export function findReadyForArchitectPayload(session: AgentSessionRecord | null): PmHandoffPayload | null {
+export function findReadyForPlannerPayload(session: AgentSessionRecord | null): PmHandoffPayload | null {
   const assistantMessages = (session?.messages ?? []).filter((message) => message.role === "assistant").reverse();
   for (const message of assistantMessages) {
-    const payload = parseReadyForArchitectPayload(message.content);
+    const payload = parseReadyForPlannerPayload(message.content);
     if (payload) return payload;
   }
   return null;
 }
 
-export function parseReadyForArchitectPayload(content: string): PmHandoffPayload | null {
+export function parseReadyForPlannerPayload(content: string): PmHandoffPayload | null {
   for (const candidate of jsonCandidates(content)) {
     try {
       const parsed = JSON.parse(candidate) as Partial<PmHandoffPayload>;
       if (
-        parsed.status === "ready_for_architect" &&
+        parsed.status === "ready_for_planner" &&
         typeof parsed.requirement === "string" &&
         Array.isArray(parsed.constraints) &&
         Array.isArray(parsed.acceptanceCriteria) &&
@@ -42,7 +42,7 @@ export function parseReadyForArchitectPayload(content: string): PmHandoffPayload
         parsed.openQuestions.length === 0
       ) {
         return {
-          status: "ready_for_architect",
+          status: "ready_for_planner",
           requirement: parsed.requirement,
           constraints: parsed.constraints.map(String),
           acceptanceCriteria: parsed.acceptanceCriteria.map(String),

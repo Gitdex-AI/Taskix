@@ -37,7 +37,7 @@ export function ProjectPhaseSwitcher({
           selectedPhase={phase}
           title="Requirements"
           value={counts.requirements}
-          detail="PM to architect handoff"
+          detail="PM to planner handoff"
           onSelect={selectPhase}
         />
         <PhaseButton

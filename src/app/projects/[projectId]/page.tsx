@@ -28,7 +28,7 @@ import { canAutoRunDeveloper } from "@/lib/auto-run-policy";
 import { requireConsolePageAuth } from "@/lib/console-auth";
 import { isDiscardableDraftWorkflow } from "@/lib/draft-workflow";
 import { checkGhStatus, getCachedGhStatus, saveGhStatus } from "@/lib/gh-status";
-import { findReadyForArchitectPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
+import { findReadyForPlannerPayload, formatPmHandoffPayload } from "@/lib/pm-handoff";
 import { findDependencyIssue, isDependencySatisfied } from "@/lib/issue-dependencies";
 import { getIssueStage, type IssueStage } from "@/lib/issue-stage";
 import { getIssueQaStatus } from "@/lib/qa-status";
@@ -88,14 +88,14 @@ export default async function ProjectDetailPage({
   const latestWorkflow = queuedWorkflow ?? visibleActiveWorkflows[0] ?? sortedWorkflows[0] ?? null;
   const pmSession = findWorkflowPmSession(sessions, project.projectId, latestWorkflow);
   const roleSession = activeSession ?? pmSession ?? await getAgentSession(`${project.projectId}:${activeRole}`);
-  const readyForArchitectPayload = findReadyForArchitectPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
-  const confirmablePmPayload = !isInspectingIssueSession && readyForArchitectPayload && (!latestWorkflow || !latestWorkflow.trackingCode)
-    ? readyForArchitectPayload
+  const readyForPlannerPayload = findReadyForPlannerPayload(pmSession ?? (activeRole === "product_manager" ? roleSession : null));
+  const confirmablePmPayload = !isInspectingIssueSession && readyForPlannerPayload && (!latestWorkflow || !latestWorkflow.trackingCode)
+    ? readyForPlannerPayload
     : null;
-  const hasMatchingPmHandoffWorkflow = readyForArchitectPayload
-    ? sortedWorkflows.some((workflow) => workflow.workflowId !== latestWorkflow?.workflowId && workflow.userRequirement === formatPmHandoffPayload(readyForArchitectPayload))
+  const hasMatchingPmHandoffWorkflow = readyForPlannerPayload
+    ? sortedWorkflows.some((workflow) => workflow.workflowId !== latestWorkflow?.workflowId && workflow.userRequirement === formatPmHandoffPayload(readyForPlannerPayload))
     : false;
-  const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !latestWorkflow && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
+  const hasUnqueuedPmHandoff = Boolean(readyForPlannerPayload && !latestWorkflow && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
   const workflowPanelWorkflows = hasUnqueuedPmHandoff ? [] : latestWorkflow ? [latestWorkflow] : [];
   const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
   const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
@@ -114,7 +114,7 @@ export default async function ProjectDetailPage({
         <ProjectWorkspaceSidebar
           project={project}
           isInspectingIssueSession={isInspectingIssueSession}
-          readyForArchitectPayload={confirmablePmPayload}
+          readyForPlannerPayload={confirmablePmPayload}
           pmSession={pmSession}
           workflows={workflowPanelWorkflows}
           visibleActiveWorkflows={visibleActiveWorkflows}
@@ -211,7 +211,7 @@ function normalizeSelectedPhase(value: string | undefined, hasUnqueuedPmHandoff:
 function ProjectWorkspaceSidebar(input: {
   project: ProjectRecord;
   isInspectingIssueSession: boolean;
-  readyForArchitectPayload: ProjectHandoffPayload;
+  readyForPlannerPayload: ProjectHandoffPayload;
   pmSession: AgentSessionRecord | undefined;
   workflows: WorkflowRecord[];
   visibleActiveWorkflows: WorkflowRecord[];
@@ -268,7 +268,7 @@ function ProjectWorkspaceSidebar(input: {
               <Text size="xs" fw={820} tt="uppercase" c="dimmed">Draft</Text>
               <Text size="xs" c="dimmed" lineClamp={1} mt={2}>Confirm to create issues.</Text>
               <Stack gap={6} mt="xs">
-                {input.readyForArchitectPayload ? <ProjectHandoffForm projectId={project.projectId} payload={input.readyForArchitectPayload} workflowId={input.activeWorkflow.workflowId} /> : null}
+                {input.readyForPlannerPayload ? <ProjectHandoffForm projectId={project.projectId} payload={input.readyForPlannerPayload} workflowId={input.activeWorkflow.workflowId} /> : null}
                 <DiscardDraftRequirementForm projectId={project.projectId} workflowId={input.activeWorkflow.workflowId} />
               </Stack>
             </div>
@@ -449,7 +449,7 @@ type ProjectHandoffPayload = ComponentProps<typeof ProjectHandoffForm>["payload"
 function buildWorkflowStepDetails(input: {
   projectId: string;
   isInspectingIssueSession: boolean;
-  readyForArchitectPayload: ProjectHandoffPayload;
+  readyForPlannerPayload: ProjectHandoffPayload;
   pmSession: AgentSessionRecord | undefined;
   sessions: AgentSessionRecord[];
   dynamicSessions: AgentSessionRecord[];
@@ -472,7 +472,7 @@ function buildWorkflowStepDetails(input: {
       <Stack gap="xs">
         <Text size="xs" c="dimmed">PM chat is the source of the requirement before it becomes planned work.</Text>
         {input.pmSession ? <SessionLink session={input.pmSession} /> : <Text size="xs" c="dimmed">No PM session has been recorded yet.</Text>}
-        {!input.isInspectingIssueSession ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} /> : null}
+        {!input.isInspectingIssueSession ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForPlannerPayload} /> : null}
       </Stack>
     ),
     planning: (
@@ -661,7 +661,7 @@ function requirementStatus(workflow: WorkflowRecord, planningJob: JobRecord | nu
   if (planningJob?.status === "failed") return { label: "Planning failed", color: "red" };
   switch (workflow.status) {
     case "created":
-    case "ready_for_architect":
+    case "ready_for_planner":
       return { label: "Awaiting confirmation", color: "blue" };
     case "planned":
       return { label: "Awaiting GitHub intake", color: "gray" };

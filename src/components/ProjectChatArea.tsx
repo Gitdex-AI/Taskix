@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { chatRoleLabel, parseChatTarget, type ChatTargetRole } from "@/lib/chat-routing";
-import { parseReadyForArchitectPayload, parseStartNewRequirementAction, type PmHandoffPayload, type PmStartNewRequirementAction } from "@/lib/pm-handoff";
+import { parseReadyForPlannerPayload, parseStartNewRequirementAction, type PmHandoffPayload, type PmStartNewRequirementAction } from "@/lib/pm-handoff";
 import type { AgentMessage, AgentSessionRecord, IssueRecord, JobRecord, WorkflowRecord } from "@/lib/types";
 
 type TimelineMessage = AgentMessage & {
@@ -558,7 +558,7 @@ function MessageList({
                   <span>{messageDisplayContent(message, jobs)}</span>
                 </Text>
                 {isMessageActivelyRunning(message, jobs) ? <MessageLiveOutput message={message} jobs={jobs} /> : null}
-                <PmReadyForArchitectAction projectId={projectId} workflowId={message.session?.workflowId ?? null} workflowConfirmed={Boolean(findWorkflow(message.session?.workflowId, workflows)?.trackingCode)} payload={message.role === "assistant" && message.sourceRole === "product_manager" ? parseReadyForArchitectPayload(message.content) : null} />
+                <PmReadyForPlannerAction projectId={projectId} workflowId={message.session?.workflowId ?? null} workflowConfirmed={Boolean(findWorkflow(message.session?.workflowId, workflows)?.trackingCode)} payload={message.role === "assistant" && message.sourceRole === "product_manager" ? parseReadyForPlannerPayload(message.content) : null} />
                 <PmNewRequirementAction projectId={projectId} workflowId={message.session?.workflowId ?? null} action={message.role === "assistant" && message.sourceRole === "product_manager" ? parseStartNewRequirementAction(message.content) : null} />
                 {message.executionLogs?.length ? <InlineExecutionLogs logs={message.executionLogs} /> : null}
               </div>
@@ -587,7 +587,7 @@ function MessageList({
   );
 }
 
-function PmReadyForArchitectAction({ projectId, workflowId, workflowConfirmed, payload }: { projectId: string; workflowId: string | null; workflowConfirmed: boolean; payload: PmHandoffPayload | null }) {
+function PmReadyForPlannerAction({ projectId, workflowId, workflowConfirmed, payload }: { projectId: string; workflowId: string | null; workflowConfirmed: boolean; payload: PmHandoffPayload | null }) {
   if (!payload || workflowConfirmed) return null;
 
   return (

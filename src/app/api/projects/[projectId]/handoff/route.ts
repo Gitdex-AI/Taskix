@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { runJobById } from "@/lib/job-runner";
 import { confirmWorkflowRequirement, createWorkflow } from "@/lib/orchestrator";
-import { findReadyForArchitectPayload, formatPmHandoffPayload, parseReadyForArchitectPayload } from "@/lib/pm-handoff";
+import { findReadyForPlannerPayload, formatPmHandoffPayload, parseReadyForPlannerPayload } from "@/lib/pm-handoff";
 import { createJob, getAgentSession, getProject, getWorkflow } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
 
   const form = await request.formData();
   const workflowId = String(form.get("workflowId") ?? "").trim();
-  const submittedPayload = parseReadyForArchitectPayload(String(form.get("payload") ?? ""));
+  const submittedPayload = parseReadyForPlannerPayload(String(form.get("payload") ?? ""));
   const directRequirement = String(form.get("requirement") ?? "").trim();
   const runPlanner = String(form.get("runPlanner") ?? "") === "1";
   const selectedWorkflow = workflowId ? await getWorkflow(workflowId) : null;
@@ -22,9 +22,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     ? await getAgentSession(`${project.projectId}:workflow:${selectedWorkflow.workflowId}:product_manager`)
     : null;
   const pmSession = selectedPmSession ?? await getAgentSession(`${project.projectId}:product_manager`);
-  const payload = submittedPayload ?? findReadyForArchitectPayload(pmSession);
+  const payload = submittedPayload ?? findReadyForPlannerPayload(pmSession);
   if (!payload && !directRequirement) {
-    return redirect(request, projectPath(project.projectId, selectedWorkflow?.workflowId ?? null, `Enter a requirement or use PM chat to produce ready_for_architect JSON.`));
+    return redirect(request, projectPath(project.projectId, selectedWorkflow?.workflowId ?? null, `Enter a requirement or use PM chat to produce ready_for_planner JSON.`));
   }
 
   try {
@@ -46,7 +46,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     next.searchParams.set("job", job.jobId);
     return NextResponse.redirect(next, { status: 303 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Architect handoff failed.";
+    const message = error instanceof Error ? error.message : "Planner handoff failed.";
     return redirect(request, projectPath(project.projectId, selectedWorkflow?.workflowId ?? null, message));
   }
 }

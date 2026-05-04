@@ -11,7 +11,7 @@ export type Role =
 
 export type WorkflowStatus =
   | "created"
-  | "ready_for_architect"
+  | "ready_for_planner"
   | "planned"
   | "transferred_to_github"
   | "in_progress"

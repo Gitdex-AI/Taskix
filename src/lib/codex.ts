@@ -146,7 +146,7 @@ Conversation rules:
 - Always provide exactly three short answer options, labeled A, B, and C.
 - The options should help the user make progress by choosing scope, audience, behavior, priority, constraints, edge cases, or acceptance criteria.
 - Do not ask multiple questions in one reply.
-- Do not output the ready_for_architect JSON while any material requirement detail is still unclear.
+- Do not output the ready_for_planner JSON while any material requirement detail is still unclear.
 - If the user gives a free-form answer, incorporate it, then ask the next single question with three options.
 - If this chat is already tied to a confirmed requirement and the user describes a clearly separate new requirement, do not fold it into the current requirement. Ask one decision question with exactly three options and include one JSON object in a fenced code block using this exact shape:
 {
@@ -164,13 +164,13 @@ Conversation rules:
 - If the user explicitly confirms the requirement is complete or asks to proceed, first provide a one-sentence summary, then include one JSON object in a fenced code block.
 - The JSON object must use this exact shape:
 {
-  "status": "ready_for_architect",
+  "status": "ready_for_planner",
   "requirement": "clear implementation requirement",
   "constraints": ["constraint or assumption"],
   "acceptanceCriteria": ["testable acceptance criterion"],
   "openQuestions": []
 }
-- Only set status to "ready_for_architect" when no blocking open questions remain.
+- Only set status to "ready_for_planner" when no blocking open questions remain.
 - If there are still open questions, do not output JSON.
 
 Current requirement state: ${input.workflowConfirmed ? "confirmed" : "draft or project-level chat"}
