@@ -12,6 +12,7 @@ import { findDependencyIssue, isDependencySatisfied, normalizeIssueDependenciesT
 import { expectedDeveloperBaseBranch, expectedDeveloperBranch, isRecoverablePrBase, prRecoveryBranches } from "@/lib/issue-run-policy";
 import { getActiveJobId } from "@/lib/job-runtime";
 import { qaValidationInstruction } from "@/lib/qa-validation-instruction";
+import { nextRequirementTrackingCodeFromWorkflows } from "@/lib/requirement-tracking-code";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, cancelPendingJobs, createJob, getAgentSession, getJob, listJobs, listWorkflows, saveProject, saveWorkflow, getWorkflow } from "@/lib/store";
 import type { DeveloperIssueResult, IssueRecord, IssueSpec, ProjectRecord, QaPrReviewResult, WorkflowRecord } from "@/lib/types";
@@ -22,7 +23,7 @@ const execFileAsync = promisify(execFile);
 
 export async function createWorkflow(requirement: string, chatId: number, project?: ProjectRecord | null): Promise<WorkflowRecord> {
   const createdAt = new Date().toISOString();
-  const trackingCode = await nextWorkflowTrackingCode(createdAt);
+  const trackingCode = await nextRequirementTrackingCode(project?.projectId ?? null);
   const workflow: WorkflowRecord = {
     workflowId: randomUUID().slice(0, 8),
     trackingCode,
@@ -67,7 +68,7 @@ export async function findOrCreateDraftWorkflow(project: ProjectRecord): Promise
 }
 
 export async function confirmWorkflowRequirement(workflow: WorkflowRecord, requirement: string, project?: ProjectRecord | null): Promise<WorkflowRecord> {
-  const trackingCode = workflow.trackingCode ?? await nextWorkflowTrackingCode(new Date().toISOString());
+  const trackingCode = workflow.trackingCode ?? await nextRequirementTrackingCode(project?.projectId ?? workflow.projectId ?? null);
   workflow.trackingCode = trackingCode;
   workflow.userRequirement = requirement;
   workflow.status = "created";
@@ -76,17 +77,8 @@ export async function confirmWorkflowRequirement(workflow: WorkflowRecord, requi
   return workflow;
 }
 
-async function nextWorkflowTrackingCode(createdAt: string): Promise<string> {
-  const day = createdAt.slice(0, 10).replace(/-/g, "");
-  const prefix = `WF-${day}-`;
-  const existing = await listWorkflows();
-  const next = existing
-    .map((workflow) => workflow.trackingCode ?? "")
-    .filter((code) => code.startsWith(prefix))
-    .map((code) => Number(code.slice(prefix.length)))
-    .filter(Number.isFinite)
-    .reduce((max, value) => Math.max(max, value), 0) + 1;
-  return `${prefix}${String(next).padStart(3, "0")}`;
+async function nextRequirementTrackingCode(projectId: string | null): Promise<string> {
+  return nextRequirementTrackingCodeFromWorkflows(await listWorkflows(), projectId);
 }
 
 export async function runWorkflow(workflowId: string, project?: ProjectRecord | null): Promise<WorkflowRecord> {
