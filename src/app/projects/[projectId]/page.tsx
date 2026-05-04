@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
 import { FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
-import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
 import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueAction";
 import { ProjectAutoRunIssuesButton } from "@/components/ProjectAutoRunIssuesButton";
 import { ProjectAutoSync } from "@/components/ProjectAutoSync";
@@ -13,7 +12,6 @@ import { ProjectEscalateSessionButton } from "@/components/ProjectEscalateSessio
 import { ProjectHandoffForm } from "@/components/ProjectHandoffForm";
 import { ProjectHandoffToQaButton } from "@/components/ProjectHandoffToQaButton";
 import { ProjectMergePrButton } from "@/components/ProjectMergePrButton";
-import { ProjectPhaseSwitcher } from "@/components/ProjectPhaseSwitcher";
 import { ProjectRetryJobButton } from "@/components/ProjectRetryJobButton";
 import { ProjectReturnToDeveloperButton } from "@/components/ProjectReturnToDeveloperButton";
 import { ProjectRunDeveloperIssueButton } from "@/components/ProjectRunDeveloperIssueButton";
@@ -37,7 +35,7 @@ import { getIssueQaStatus } from "@/lib/qa-status";
 import { getAgentSession, getProject, listAgentSessions, listJobs, listProjectWorkflows, listProjects } from "@/lib/store";
 import type { AgentSessionRecord, IssueRecord, JobRecord, ProjectRecord, WorkflowRecord } from "@/lib/types";
 import type { AutoRunState } from "@/lib/auto-run-control";
-import { getWorkflowProgress, type WorkflowProgressStep } from "@/lib/workflow-progress";
+import type { WorkflowProgressStep } from "@/lib/workflow-progress";
 import {
   hasAnyLabel,
   recoveryReasonForDeveloperStep,
@@ -86,7 +84,6 @@ export default async function ProjectDetailPage({
   const queuedWorkflowId = query.workflow ?? null;
   const queuedJobId = query.job ?? null;
   const queuedWorkflow = queuedWorkflowId ? sortedWorkflows.find((workflow) => workflow.workflowId === queuedWorkflowId) ?? null : null;
-  const queuedJob = queuedJobId ? jobs.find((job) => job.jobId === queuedJobId) ?? null : null;
   const visibleActiveWorkflows = prioritizeById(activeWorkflows, queuedWorkflowId);
   const latestWorkflow = queuedWorkflow ?? visibleActiveWorkflows[0] ?? sortedWorkflows[0] ?? null;
   const pmSession = findWorkflowPmSession(sessions, project.projectId, latestWorkflow);
@@ -99,30 +96,11 @@ export default async function ProjectDetailPage({
     ? sortedWorkflows.some((workflow) => workflow.workflowId !== latestWorkflow?.workflowId && workflow.userRequirement === formatPmHandoffPayload(readyForArchitectPayload))
     : false;
   const hasUnqueuedPmHandoff = Boolean(readyForArchitectPayload && !latestWorkflow && !hasMatchingPmHandoffWorkflow && !queuedWorkflow && !isInspectingIssueSession);
-  const selectedPhase = normalizeSelectedPhase(query.phase, hasUnqueuedPmHandoff);
   const workflowPanelWorkflows = hasUnqueuedPmHandoff ? [] : latestWorkflow ? [latestWorkflow] : [];
   const workflowPanelJobs = filterJobsForWorkflows(jobs, workflowPanelWorkflows);
   const workflowPanelSessions = filterSessionsForWorkflows(sessions, workflowPanelWorkflows);
   const chatSessions = isInspectingIssueSession ? sessions : workflowPanelSessions;
   const autoRunState = getAutoRunState(project.projectId);
-  const workflowPanelDynamicSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "planner" && session.role !== "devops" && !session.archivedAt);
-  const workflowPanelArchivedSessions = workflowPanelSessions.filter((session) => session.role !== "product_manager" && session.role !== "planner" && session.role !== "devops" && session.archivedAt);
-  const workflowProgress = getWorkflowProgress({ workflows: workflowPanelWorkflows, jobs: workflowPanelJobs });
-  const workflowStepDetails = buildWorkflowStepDetails({
-    projectId: project.projectId,
-    isInspectingIssueSession,
-    readyForArchitectPayload: confirmablePmPayload,
-    pmSession,
-    sessions: workflowPanelSessions,
-    dynamicSessions: workflowPanelDynamicSessions,
-    archivedSessions: workflowPanelArchivedSessions,
-    jobs: workflowPanelJobs,
-    activeWorkflows: workflowPanelWorkflows,
-    visibleActiveWorkflows: workflowPanelWorkflows,
-    queuedWorkflow,
-    queuedJob,
-    queuedJobId
-  });
 
   return (
     <>
@@ -135,7 +113,6 @@ export default async function ProjectDetailPage({
       <div className="project-chat-layout">
         <ProjectWorkspaceSidebar
           project={project}
-          selectedPhase={selectedPhase}
           isInspectingIssueSession={isInspectingIssueSession}
           readyForArchitectPayload={confirmablePmPayload}
           pmSession={pmSession}
@@ -231,29 +208,8 @@ function normalizeSelectedPhase(value: string | undefined, hasUnqueuedPmHandoff:
   return hasUnqueuedPmHandoff ? "requirements" : "github";
 }
 
-function getPhaseCounts(workflows: WorkflowRecord[], jobs: JobRecord[]): {
-  requirements: number;
-  github: number;
-  operations: number;
-  readyJobs: number;
-} {
-  const requirementCount = workflows.filter((workflow) => !workflow.issues.length || workflow.status === "created" || workflow.status === "ready_for_architect").length;
-  const githubIssues = workflows.flatMap((workflow) => workflow.issues);
-  const activeGithubIssues = githubIssues.filter((issue) => issue.githubState !== "CLOSED" && issue.prState !== "MERGED").length;
-  const opsJobs = jobs.filter((job) => job.type !== "workflow_run" && job.type !== "issue_run" && job.type !== "qa_run").length;
-  const readyJobs = jobs.filter((job) => job.status === "pending").length;
-
-  return {
-    requirements: requirementCount,
-    github: activeGithubIssues,
-    operations: opsJobs,
-    readyJobs
-  };
-}
-
 function ProjectWorkspaceSidebar(input: {
   project: ProjectRecord;
-  selectedPhase: WorkflowPhase;
   isInspectingIssueSession: boolean;
   readyForArchitectPayload: ProjectHandoffPayload;
   pmSession: AgentSessionRecord | undefined;
@@ -272,6 +228,7 @@ function ProjectWorkspaceSidebar(input: {
   ghUserLogin: string | null;
 }) {
   const project = input.project;
+  const draftWorkflow = input.requirementWorkflows.find((workflow) => isDiscardableDraftWorkflow(project.projectId, workflow)) ?? null;
 
   return (
     <aside className="project-workspace-sidebar" aria-label="Project workspace">
@@ -303,81 +260,36 @@ function ProjectWorkspaceSidebar(input: {
               leftSection={<Plus size={16} />}
               mt="sm"
             >
-              New Requirement
+              {draftWorkflow ? "Continue Draft" : "New Requirement"}
             </Button>
           </form>
+          {input.activeWorkflow && isDiscardableDraftWorkflow(project.projectId, input.activeWorkflow) ? (
+            <div className="project-sidebar-draft">
+              <Text size="xs" fw={820} tt="uppercase" c="dimmed">Draft</Text>
+              <Text size="xs" c="dimmed" lineClamp={2} mt={2}>Confirm the draft to create a numbered requirement and GitHub issues.</Text>
+              <Stack gap={6} mt="xs">
+                {input.readyForArchitectPayload ? <ProjectHandoffForm projectId={project.projectId} payload={input.readyForArchitectPayload} workflowId={input.activeWorkflow.workflowId} /> : null}
+                <DiscardDraftRequirementForm projectId={project.projectId} workflowId={input.activeWorkflow.workflowId} />
+              </Stack>
+            </div>
+          ) : null}
         </div>
 
         <div className="project-sidebar-section">
           <Group justify="space-between" gap="xs" mb="xs" wrap="nowrap">
-            <Text size="xs" fw={820} tt="uppercase" c="dimmed">Workflows</Text>
+            <Text size="xs" fw={820} tt="uppercase" c="dimmed">Requirements</Text>
             <Button component="a" href={`/projects/${project.projectId}/requirements`} variant="subtle" size="compact-xs" radius="xl">
               View all
             </Button>
           </Group>
-          <Stack gap={4}>
-            {renderWorkflowSwitcher(project.projectId, input.requirementWorkflows, input.jobs, input.activeWorkflow?.workflowId ?? null)}
-          </Stack>
-        </div>
-
-        <div className="project-sidebar-section project-sidebar-stage">
-          <ProjectAutoRunJob projectId={project.projectId} enabled={input.autorunEnabled} />
-          <ProjectPhaseSwitcher
-            initialPhase={input.selectedPhase}
-            counts={getPhaseCounts(input.requirementWorkflows, input.jobs)}
-            content={{
-              requirements: (
-                <ThreePhaseWorkflowPanel
-                  projectId={project.projectId}
-                  selectedPhase="requirements"
-                  isInspectingIssueSession={input.isInspectingIssueSession}
-                  readyForArchitectPayload={input.readyForArchitectPayload}
-                  pmSession={input.pmSession}
-                  activeWorkflow={input.activeWorkflow}
-                  workflows={input.visibleActiveWorkflows}
-                  requirementWorkflows={input.requirementWorkflows}
-                  doneWorkflows={input.doneWorkflows}
-                  sessions={input.sessions}
-                  jobs={input.jobs}
-                  queuedJobId={input.queuedJobId}
-                  autoRunState={input.autoRunState}
-                />
-              ),
-              github: (
-                <ThreePhaseWorkflowPanel
-                  projectId={project.projectId}
-                  selectedPhase="github"
-                  isInspectingIssueSession={input.isInspectingIssueSession}
-                  readyForArchitectPayload={input.readyForArchitectPayload}
-                  pmSession={input.pmSession}
-                  activeWorkflow={input.activeWorkflow}
-                  workflows={input.workflows}
-                  requirementWorkflows={input.requirementWorkflows}
-                  doneWorkflows={input.doneWorkflows}
-                  sessions={input.sessions}
-                  jobs={input.jobs}
-                  queuedJobId={input.queuedJobId}
-                  autoRunState={input.autoRunState}
-                />
-              ),
-              operations: (
-                <ThreePhaseWorkflowPanel
-                  projectId={project.projectId}
-                  selectedPhase="operations"
-                  isInspectingIssueSession={input.isInspectingIssueSession}
-                  readyForArchitectPayload={input.readyForArchitectPayload}
-                  pmSession={input.pmSession}
-                  activeWorkflow={input.activeWorkflow}
-                  workflows={input.visibleActiveWorkflows}
-                  requirementWorkflows={input.requirementWorkflows}
-                  doneWorkflows={input.doneWorkflows}
-                  sessions={input.sessions}
-                  jobs={input.jobs}
-                  queuedJobId={input.queuedJobId}
-                  autoRunState={input.autoRunState}
-                />
-              )
-            }}
+          <RequirementIssueTree
+            projectId={project.projectId}
+            workflows={input.requirementWorkflows.filter((workflow) => Boolean(workflow.trackingCode))}
+            activeWorkflow={input.activeWorkflow?.trackingCode ? input.activeWorkflow : null}
+            sessions={input.sessions}
+            jobs={input.jobs}
+            queuedJobId={input.queuedJobId}
+            autoRunState={input.autoRunState}
           />
         </div>
       </div>
@@ -436,102 +348,58 @@ function ProjectWorkspaceSidebar(input: {
   );
 }
 
-function renderWorkflowSwitcher(projectId: string, workflows: WorkflowRecord[], jobs: JobRecord[], activeWorkflowId: string | null): ReactNode {
-  if (!workflows.length) return <Text size="xs" c="dimmed">No requirements yet.</Text>;
-  return workflows.slice(0, 12).map((workflow) => {
-    const planningJob = latestWorkflowJob(workflow.workflowId, jobs, "workflow_run");
-    const status = requirementStatus(workflow, planningJob);
-    const active = workflow.workflowId === activeWorkflowId;
-    return (
-      <a
-        key={workflow.workflowId}
-        href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=${workflow.trackingCode ? "github" : "requirements"}`}
-        className={`workflow-switch-row${active ? " active" : ""}`}
-      >
-        <div className="workflow-switch-main">
-          <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? "Draft requirement"}</Text>
-          <Text size="xs" c="dimmed" lineClamp={1}>{workflow.userRequirement}</Text>
-        </div>
-        <Badge size="xs" color={status.color} variant={active ? "filled" : "light"}>{status.label}</Badge>
-      </a>
-    );
-  });
-}
-
-function ThreePhaseWorkflowPanel(input: {
+function RequirementIssueTree(input: {
   projectId: string;
-  selectedPhase: WorkflowPhase;
-  isInspectingIssueSession: boolean;
-  readyForArchitectPayload: ProjectHandoffPayload;
-  pmSession: AgentSessionRecord | undefined;
-  activeWorkflow: WorkflowRecord | null;
   workflows: WorkflowRecord[];
-  requirementWorkflows: WorkflowRecord[];
-  doneWorkflows: WorkflowRecord[];
+  activeWorkflow: WorkflowRecord | null;
   sessions: AgentSessionRecord[];
   jobs: JobRecord[];
   queuedJobId: string | null;
   autoRunState: AutoRunState | null;
-}) {
-  const devopsSessions = input.sessions.filter((session) => session.role === "devops");
-
-  if (input.selectedPhase === "requirements") {
-    return (
-      <section className="phase-panel">
-        <Stack gap="xs">
-          <Text size="xs" c="dimmed">PM confirms scope, then planner creates GitHub issues.</Text>
-          {input.activeWorkflow && isDiscardableDraftWorkflow(input.projectId, input.activeWorkflow) ? <DiscardDraftRequirementForm projectId={input.projectId} workflowId={input.activeWorkflow.workflowId} /> : null}
-          {!input.isInspectingIssueSession && input.readyForArchitectPayload ? <ProjectHandoffForm projectId={input.projectId} payload={input.readyForArchitectPayload} workflowId={input.activeWorkflow?.workflowId ?? null} /> : null}
-          {renderRequirementRows(input.projectId, input.requirementWorkflows, input.jobs)}
-        </Stack>
-        <Group justify="flex-end" gap="xs" mt="xs">
-          <Button component="a" href={`/projects/${input.projectId}/requirements`} variant="subtle" size="compact-xs" radius="xl">
-            View All Requirements
-          </Button>
-        </Group>
-      </section>
-    );
-  }
-
-  if (input.selectedPhase === "github") {
-    return (
-      <section className="phase-panel">
-        <Group justify="space-between" align="flex-start" gap="sm" wrap="nowrap">
-          <Text size="xs" c="dimmed" style={{ minWidth: 0 }}>GitHub issues drive development, QA, review, and merge.</Text>
-          <ProjectAutoRunIssuesButton
-            projectId={input.projectId}
-            workflowIds={input.workflows.map((workflow) => workflow.workflowId)}
-            issueIds={input.workflows.flatMap((workflow) => workflow.issues.map((issue) => issue.issueId))}
-            initialState={input.autoRunState}
-            runningLabel={activeAutoRunLabel(input.jobs, input.workflows)}
-          />
-        </Group>
-        <Stack gap="xs" mt="sm">
-          {renderGithubIssueRows(input.projectId, input.workflows, input.sessions, input.jobs, input.queuedJobId, input.autoRunState)}
-        </Stack>
-        <Group justify="flex-end" gap="xs" mt="xs">
-          <Button component="a" href={`/projects/${input.projectId}/github-triage`} variant="subtle" size="compact-xs" radius="xl">
-            View All Issues
-          </Button>
-        </Group>
-      </section>
-    );
-  }
-
+}): ReactNode {
+  if (!input.workflows.length) return <Text size="xs" c="dimmed">No confirmed requirements yet.</Text>;
   return (
-      <section className="phase-panel">
-        <Group justify="space-between" align="flex-start" gap="sm">
-          <Text size="xs" c="dimmed">DevOps handles deployment, incidents, and follow-up issue intake.</Text>
-          <Button component="a" href={`/projects/${input.projectId}?role=devops`} variant="light" size="compact-xs" radius="xl">
-            Open DevOps
-          </Button>
-        </Group>
-        <Stack gap="xs" mt="sm">
-          {devopsSessions.length ? renderSessionRows(devopsSessions) : <Text size="xs" c="dimmed">No DevOps session has been recorded yet.</Text>}
-          <CompletedWorkflowHistory projectId={input.projectId} workflows={input.doneWorkflows} />
-        </Stack>
-      </section>
+    <Stack gap={6}>
+      {renderRequirementTreeRows(input.projectId, input.workflows, input.activeWorkflow, input.sessions, input.jobs, input.queuedJobId, input.autoRunState)}
+    </Stack>
   );
+}
+
+function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[], activeWorkflow: WorkflowRecord | null, sessions: AgentSessionRecord[], jobs: JobRecord[], queuedJobId: string | null, autoRunState: AutoRunState | null): ReactNode {
+  return workflows.slice(0, 12).map((workflow) => {
+    const planningJob = latestWorkflowJob(workflow.workflowId, jobs, "workflow_run");
+    const status = requirementStatus(workflow, planningJob);
+    const active = workflow.workflowId === activeWorkflow?.workflowId;
+    return (
+      <div key={workflow.workflowId} className={`requirement-tree-item${active ? " active" : ""}`}>
+        <a
+          href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
+          className="requirement-tree-link"
+        >
+          <div className="workflow-switch-main">
+            <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
+            <Text size="xs" c="dimmed" lineClamp={1}>{workflow.userRequirement}</Text>
+          </div>
+          <Badge size="xs" color={status.color} variant={active ? "filled" : "light"}>{status.label}</Badge>
+        </a>
+        {active ? (
+          <div className="requirement-tree-issues">
+            <Group justify="space-between" align="center" gap="xs" mb="xs" wrap="nowrap">
+              <Text size="xs" fw={820} tt="uppercase" c="dimmed">Issues</Text>
+              <ProjectAutoRunIssuesButton
+                projectId={projectId}
+                workflowIds={[workflow.workflowId]}
+                issueIds={workflow.issues.map((issue) => issue.issueId)}
+                initialState={autoRunState}
+                runningLabel={activeAutoRunLabel(jobs, [workflow])}
+              />
+            </Group>
+            {renderGithubIssueRows(projectId, [workflow], sessions, jobs, queuedJobId, autoRunState)}
+          </div>
+        ) : null}
+      </div>
+    );
+  });
 }
 
 function DiscardDraftRequirementForm({ projectId, workflowId }: { projectId: string; workflowId: string }) {

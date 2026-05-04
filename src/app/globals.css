@@ -574,6 +574,49 @@ body.workspace-mode-body .topbar {
   min-width: 0;
 }
 
+.project-sidebar-draft {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e0e7f0;
+  border-radius: 8px;
+}
+
+.requirement-tree-item {
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.requirement-tree-item.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.requirement-tree-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px 10px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.requirement-tree-link:hover {
+  background: #f8fafc;
+}
+
+.requirement-tree-issues {
+  padding: 0 8px 8px 18px;
+}
+
+.requirement-tree-issues .github-issue-row {
+  margin-top: 6px;
+  background: #ffffff;
+}
+
 .project-sidebar-footer {
   flex: 0 0 auto;
   padding: 10px 12px;
