@@ -69,12 +69,11 @@ export async function SettingsPanel({
         <form method="post" action="/api/github/account" data-settings-form className="settings-form">
           <ReturnToInput returnTo={returnTo} />
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-            <TextInput name="githubUsername" label="GitHub Owner" description="User or organization, for example octocat or my-org." defaultValue={settings.githubUsername} placeholder="owner-or-org" required />
+            <TextInput name="githubUsername" label="GitHub Owner" defaultValue={settings.githubUsername} placeholder="owner-or-org" required />
             <TextInput label="SSH Private Key" value={settings.githubSshPrivateKeyPath || "not generated"} readOnly />
           </SimpleGrid>
           <Textarea
             label="SSH Public Key"
-            description="Add this key to the GitHub user/org that owns the repositories."
             value={settings.githubSshPublicKey || "Generate a key first."}
             autosize
             minRows={3}
@@ -120,7 +119,7 @@ export async function SettingsPanel({
             <Text className="section-title">Codex CLI</Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <TextInput name="codexBin" label="Codex Binary" defaultValue={settings.codexBin} />
-              <TextInput name="codexHome" label="Codex Home" defaultValue={settings.codexHome} description="Must contain Codex login/auth state for bot execution." />
+              <TextInput name="codexHome" label="Codex Home" defaultValue={settings.codexHome} />
               <TextInput name="codexModel" label="Model" defaultValue={settings.codexModel} />
               <TextInput name="codexSandbox" label="Sandbox" defaultValue={settings.codexSandbox} />
               <TextInput name="codexApprovalPolicy" label="Approval Policy" defaultValue={settings.codexApprovalPolicy} />
