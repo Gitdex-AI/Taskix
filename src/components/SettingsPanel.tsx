@@ -2,6 +2,7 @@ import { Alert, Badge, Button, Checkbox, Code, Group, NumberInput, Paper, Passwo
 import { GitBranch, Info, KeyRound, Save, Trash2, Webhook, Wrench } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
 import { SettingsReturnNavigation } from "@/components/settings/SettingsReturnNavigation";
+import { ThemeSelector } from "@/components/theme/ThemeSelector";
 import { getSettings } from "@/lib/settings";
 import type { RecentProjectChat } from "@/lib/return-navigation";
 
@@ -32,6 +33,17 @@ export async function SettingsPanel({
           {message ?? error}
         </Alert>
       )}
+      <Paper mb="md">
+        <Group justify="space-between" p="md">
+          <div>
+            <Text fw={760}>Appearance</Text>
+            <Text size="sm" c="dimmed">
+              Switch between system, light, and dark themes.
+            </Text>
+          </div>
+          <ThemeSelector />
+        </Group>
+      </Paper>
       <Paper mb="md">
         <Group justify="space-between" p="md">
           <div>

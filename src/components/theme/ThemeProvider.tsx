@@ -9,7 +9,6 @@ import {
   resolveEffectiveTheme,
   themePalettes
 } from "./theme-state";
-import { ThemeSelector } from "./ThemeSelector";
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -96,7 +95,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <ThemeContext.Provider value={value}>
       {children}
-      <ThemeSelector />
     </ThemeContext.Provider>
   );
 }

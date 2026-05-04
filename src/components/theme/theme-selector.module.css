@@ -1,19 +1,13 @@
 .toggle {
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  z-index: 50;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 34px;
   height: 34px;
   color: var(--app-control-text);
-  background: color-mix(in srgb, var(--app-shell) 92%, transparent);
+  background: var(--app-control-bg-muted);
   border: 1px solid var(--app-border);
   border-radius: 999px;
-  box-shadow: 0 8px 22px var(--app-shadow-md);
-  backdrop-filter: blur(12px);
   cursor: pointer;
 }
 
