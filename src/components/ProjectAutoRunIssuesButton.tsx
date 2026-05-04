@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { announceIssueAutoRunStart } from "@/components/ProjectAutoRunIssueAction";
 import type { AutoRunState, AutoRunStatus } from "@/lib/auto-run-control";
 
-const runningStatuses = new Set<AutoRunStatus>(["running", "pause_requested", "cancel_requested"]);
+const runningStatuses = new Set<AutoRunStatus>(["running", "cancel_requested"]);
 
 export function ProjectAutoRunIssuesButton({
   projectId,
@@ -29,7 +29,7 @@ export function ProjectAutoRunIssuesButton({
   const autoRunActive = runningStatuses.has(state?.status ?? "idle");
   const externalRunActive = Boolean(runningLabel);
   const running = pending || autoRunActive || externalRunActive;
-  const paused = state?.status === "paused";
+  const paused = state?.status === "paused" || state?.status === "pause_requested";
 
   useEffect(() => {
     setState(initialState);
@@ -61,7 +61,7 @@ export function ProjectAutoRunIssuesButton({
 
   function autoRun() {
     setPending(true);
-    setState({
+    const nextState: AutoRunState = {
       runId: "starting",
       projectId,
       status: "running",
@@ -70,13 +70,14 @@ export function ProjectAutoRunIssuesButton({
       message: "Auto Run is starting.",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    });
+    };
+    setState(nextState);
     setError("");
     announceIssueAutoRunStart();
-    void fetch(`/api/projects/${projectId}/issues/auto-run`, {
+    void fetch(paused ? `/api/projects/${projectId}/issues/auto-run/control` : `/api/projects/${projectId}/issues/auto-run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workflowIds, issueIds })
+      body: JSON.stringify(paused ? { action: "resume" } : { workflowIds, issueIds })
     })
       .then(async (response) => {
         const payload = await response.json().catch(() => ({})) as { error?: string; message?: string; state?: AutoRunState | null };

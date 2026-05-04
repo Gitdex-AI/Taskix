@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const projectPageSource = await readFile(new URL("../src/app/projects/[projectId]/page.tsx", import.meta.url), "utf8");
 const chatAreaSource = await readFile(new URL("../src/components/ProjectChatArea.tsx", import.meta.url), "utf8");
+const autoRunButtonSource = await readFile(new URL("../src/components/ProjectAutoRunIssuesButton.tsx", import.meta.url), "utf8");
 const globalStyles = await readFile(new URL("../src/app/globals.css", import.meta.url), "utf8");
 
 assert.doesNotMatch(
@@ -57,6 +58,30 @@ assert.match(
   chatAreaSource,
   /if \(job && job\.status !== "running"\) return stripAgentFinalBlocks\(message\.content\);/,
   "Stale running messages linked to terminal jobs should render as static text without elapsed time"
+);
+
+assert.match(
+  autoRunButtonSource,
+  /const runningStatuses = new Set<AutoRunStatus>\(\["running", "cancel_requested"\]\);/,
+  "Pause-requested Auto Run state should not keep the primary Auto Run button spinning"
+);
+
+assert.match(
+  autoRunButtonSource,
+  /const paused = state\?\.status === "paused" \|\| state\?\.status === "pause_requested";/,
+  "Pause-requested Auto Run state should be resumable from the primary button"
+);
+
+assert.match(
+  autoRunButtonSource,
+  /fetch\(paused \? `\/api\/projects\/\$\{projectId\}\/issues\/auto-run\/control` : `\/api\/projects\/\$\{projectId\}\/issues\/auto-run`/,
+  "Resume should use the Auto Run control route instead of trying to start a duplicate run"
+);
+
+assert.match(
+  projectPageSource,
+  /\["running", "cancel_requested"\]\.includes\(state\.status\)/,
+  "Issue-level pending jobs should not render as active spinners while Auto Run is only pause-requested"
 );
 
 console.log("chat UI source verification passed");

@@ -1037,7 +1037,7 @@ function runningLabelForStage(stage: string, issue: IssueRecord): string {
 }
 
 function isAutoRunRunningForIssue(state: AutoRunState | null, issue: IssueRecord): boolean {
-  return Boolean(state && ["running", "pause_requested", "cancel_requested"].includes(state.status) && state.issueIds.includes(issue.issueId));
+  return Boolean(state && ["running", "cancel_requested"].includes(state.status) && state.issueIds.includes(issue.issueId));
 }
 
 function activeAutoRunLabel(jobs: JobRecord[], workflows: WorkflowRecord[]): string | null {
