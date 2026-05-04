@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Alert, Badge, Button, Code, Group, Paper, Stack, Text, Title } from "@mantine/core";
-import { Archive, ArrowLeft, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
+import { Archive, ArrowLeft, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueAction";
 import { ProjectAutoRunIssuesButton } from "@/components/ProjectAutoRunIssuesButton";
@@ -318,7 +318,6 @@ function ProjectWorkspaceSidebar(input: {
   const project = input.project;
   const draftWorkflow = input.requirementWorkflows.find((workflow) => isDiscardableDraftWorkflow(project.projectId, workflow)) ?? null;
   const requirementsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "requirements", activePanel: input.activePanel });
-  const toolsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "tools", activePanel: input.activePanel });
   const settingsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "settings", activePanel: input.activePanel });
 
   return (
@@ -404,15 +403,6 @@ function ProjectWorkspaceSidebar(input: {
             </div>
           </Group>
           <Group gap={4} wrap="nowrap">
-            <Link
-              href={toolsPanelAction.href}
-              className={`sidebar-icon-link${toolsPanelAction.active ? " active" : ""}`}
-              title="Tools"
-              aria-label="Tools"
-              data-nav-action={toolsPanelAction.action}
-            >
-              <Wrench size={16} />
-            </Link>
             <Link
               href={settingsPanelAction.href}
               className={`sidebar-icon-link${settingsPanelAction.active ? " active" : ""}`}
