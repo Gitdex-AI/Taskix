@@ -411,7 +411,7 @@ function DiscardDraftRequirementForm({ projectId, workflowId }: { projectId: str
           <Text size="xs" c="dimmed">Discard this unconfirmed draft and remove its PM chat.</Text>
         </div>
         <Button type="submit" variant="light" color="red" size="compact-xs" radius="xl" leftSection={<Trash2 size={14} />}>
-          Discard Draft
+          Discard
         </Button>
       </Group>
     </form>
