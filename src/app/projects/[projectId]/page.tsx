@@ -465,6 +465,7 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
     const status = requirementStatus(workflow, planningJob);
     const active = workflow.workflowId === activeWorkflow?.workflowId;
     const planningAction = active ? renderRequirementRunAction(projectId, planningJob) : null;
+    const hasRunnableIssues = workflow.status !== "done" && workflow.issues.some((issue) => !isCompletedIssue(issue));
     return (
       <div key={workflow.workflowId} className={`requirement-tree-item${active ? " active" : ""}`}>
         <div className="requirement-tree-link">
@@ -481,7 +482,7 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
             </div>
             <Group gap={6} justify="flex-end" wrap="nowrap">
               {planningAction}
-              {active && !planningAction && workflow.issues.length ? (
+              {active && !planningAction && hasRunnableIssues ? (
                 <ProjectAutoRunIssuesButton
                   projectId={projectId}
                   workflowIds={[workflow.workflowId]}

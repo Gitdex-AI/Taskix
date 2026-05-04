@@ -84,4 +84,16 @@ assert.match(
   "Issue-level pending jobs should not render as active spinners while Auto Run is only pause-requested"
 );
 
+assert.match(
+  projectPageSource,
+  /const hasRunnableIssues = workflow\.status !== "done" && workflow\.issues\.some\(\(issue\) => !isCompletedIssue\(issue\)\);/,
+  "Completed requirements should not show Auto Run just because they still contain historical issues"
+);
+
+assert.match(
+  projectPageSource,
+  /active && !planningAction && hasRunnableIssues/,
+  "Requirement Auto Run should only render when the active requirement still has runnable issues"
+);
+
 console.log("chat UI source verification passed");
