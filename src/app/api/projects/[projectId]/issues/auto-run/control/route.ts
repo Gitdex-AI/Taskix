@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cancelAutoRunJobs, getAutoRunState, updateAutoRunState } from "@/lib/auto-run-control";
+import { runProjectIssueAutoRun } from "@/lib/project-auto-runner";
 import { getProject } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
@@ -26,7 +27,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     return NextResponse.json({ ok: true, state });
   }
   if (action === "resume") {
-    const state = updateAutoRunState(project.projectId, { status: "running", message: "Auto Run resumed." });
+    const currentState = getAutoRunState(project.projectId);
+    if (!currentState || !currentState.issueIds.length) {
+      return NextResponse.json({ error: "Auto Run has no resumable issue scope." }, { status: 409 });
+    }
+    if (currentState.status === "running" || currentState.status === "pause_requested" || currentState.status === "cancel_requested") {
+      return NextResponse.json({ error: "Auto Run is already active.", state: currentState }, { status: 409 });
+    }
+    const state = updateAutoRunState(project.projectId, {
+      runId: currentState.runId,
+      status: "running",
+      workflowIds: currentState.workflowIds,
+      issueIds: currentState.issueIds,
+      message: "Auto Run resumed."
+    });
+    void runProjectIssueAutoRun(project, { workflowIds: state.workflowIds, issueIds: state.issueIds, initialState: state }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Auto Run failed.";
+      updateAutoRunState(project.projectId, { runId: state.runId, status: "failed", message });
+    });
     return NextResponse.json({ ok: true, state });
   }
   if (action === "cancel") {
