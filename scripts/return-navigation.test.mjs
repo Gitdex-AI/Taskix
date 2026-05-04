@@ -5,6 +5,7 @@ import {
   isProjectChatHref,
   resolveConsoleNavAction,
   resolveConsoleReturnDestination,
+  resolveProjectWorkspacePanelNavAction,
   shouldRecordPriorConsoleDestination
 } from "../src/lib/return-navigation.ts";
 
@@ -100,6 +101,90 @@ test("inactive left-bottom navigation opens the selected destination", () => {
 
   assert.deepEqual(action, {
     href: "/projects/project-a?panel=tools",
+    active: false,
+    action: "open"
+  });
+});
+
+test("active project workspace panel nav re-click returns to the same project workspace", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project-a",
+    panel: "tools",
+    activePanel: "tools"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project-a",
+    active: true,
+    action: "return"
+  });
+});
+
+test("active project workspace panel nav preserves encoded project id", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project/a",
+    panel: "settings",
+    activePanel: "settings"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project%2Fa",
+    active: true,
+    action: "return"
+  });
+});
+
+test("active project workspace projects nav ignores stale prior destinations", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project-a",
+    panel: "projects",
+    activePanel: "projects"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project-a",
+    active: true,
+    action: "return"
+  });
+});
+
+test("active project workspace requirements nav returns to the same project workspace", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project-a",
+    panel: "requirements",
+    activePanel: "requirements"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project-a",
+    active: true,
+    action: "return"
+  });
+});
+
+test("inactive project workspace panel nav opens the requested panel for the same project", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project-a",
+    panel: "settings",
+    activePanel: "tools"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project-a?panel=settings",
+    active: false,
+    action: "open"
+  });
+});
+
+test("inactive project workspace panel nav preserves encoded project id", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project/a",
+    panel: "tools",
+    activePanel: "settings"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project%2Fa?panel=tools",
     active: false,
     action: "open"
   });
