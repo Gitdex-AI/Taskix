@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
+import { ActionIcon, Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
 import { Archive, FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueAction";
@@ -433,9 +433,9 @@ function DiscardDraftRequirementForm({ projectId, workflowId }: { projectId: str
 function ArchiveRequirementForm({ projectId, workflowId }: { projectId: string; workflowId: string }) {
   return (
     <form method="post" action={`/api/projects/${projectId}/requirements/${workflowId}/archive`}>
-      <Button type="submit" variant="light" color="red" size="compact-xs" radius="xl" leftSection={<Archive size={14} />}>
-        Archive
-      </Button>
+      <ActionIcon type="submit" variant="light" color="red" size="sm" radius="xl" title="Archive requirement" aria-label="Archive requirement">
+        <Archive size={14} />
+      </ActionIcon>
     </form>
   );
 }
