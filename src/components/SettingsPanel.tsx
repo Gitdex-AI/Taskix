@@ -84,7 +84,7 @@ export async function SettingsPanel({
           </Alert>
           <Group className="form-actions">
             <Button type="submit" leftSection={<KeyRound size={16} />}>
-              Save Account
+              Ensure SSH Key
             </Button>
             <Button component="a" href="https://github.com/settings/keys" target="_blank" variant="light" leftSection={<GitBranch size={16} />}>
               SSH Keys
