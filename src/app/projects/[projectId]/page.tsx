@@ -371,6 +371,7 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
     const planningJob = latestWorkflowJob(workflow.workflowId, jobs, "workflow_run");
     const status = requirementStatus(workflow, planningJob);
     const active = workflow.workflowId === activeWorkflow?.workflowId;
+    const planningAction = active ? renderRequirementRunAction(projectId, planningJob) : null;
     return (
       <div key={workflow.workflowId} className={`requirement-tree-item${active ? " active" : ""}`}>
         <div className="requirement-tree-link">
@@ -387,7 +388,16 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
             </div>
           </a>
           <Group gap={6} justify="flex-end" wrap="nowrap">
-            {active ? renderRequirementRunAction(projectId, planningJob) : null}
+            {planningAction}
+            {active && !planningAction && workflow.issues.length ? (
+              <ProjectAutoRunIssuesButton
+                projectId={projectId}
+                workflowIds={[workflow.workflowId]}
+                issueIds={workflow.issues.map((issue) => issue.issueId)}
+                initialState={autoRunState}
+                runningLabel={activeAutoRunLabel(jobs, [workflow])}
+              />
+            ) : null}
             {active ? <ArchiveRequirementForm projectId={projectId} workflowId={workflow.workflowId} /> : null}
           </Group>
         </div>
@@ -395,15 +405,6 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
           <div className="requirement-tree-issues">
             <Group justify="space-between" align="center" gap="xs" mb="xs" wrap="nowrap">
               <Text size="xs" fw={820} tt="uppercase" c="dimmed">Issues</Text>
-              {workflow.issues.length ? (
-                <ProjectAutoRunIssuesButton
-                  projectId={projectId}
-                  workflowIds={[workflow.workflowId]}
-                  issueIds={workflow.issues.map((issue) => issue.issueId)}
-                  initialState={autoRunState}
-                  runningLabel={activeAutoRunLabel(jobs, [workflow])}
-                />
-              ) : null}
             </Group>
             {renderGithubIssueRows(projectId, [workflow], sessions, jobs, queuedJobId, autoRunState)}
           </div>
