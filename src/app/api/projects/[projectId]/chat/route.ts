@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { CodexClient } from "@/lib/codex";
 import { chatRoleLabel, parseChatTarget } from "@/lib/chat-routing";
-import { createDraftWorkflow } from "@/lib/orchestrator";
+import { findOrCreateDraftWorkflow } from "@/lib/orchestrator";
 import { getSettings } from "@/lib/settings";
 import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveProject } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   const workflow = role === "product_manager"
     ? submittedWorkflow?.projectId === project.projectId
       ? submittedWorkflow
-      : await createDraftWorkflow(project)
+      : await findOrCreateDraftWorkflow(project)
     : null;
   const workflowId = workflow?.workflowId ?? null;
   const sessionKey = role === "product_manager" && workflowId

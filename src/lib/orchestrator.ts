@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { agentJobMessageId } from "@/lib/agent-run-messages";
 import { CodexClient } from "@/lib/codex";
 import { developerRoleIds, type DeveloperRoleId } from "@/lib/developer-roles";
+import { latestReusableDraftWorkflow } from "@/lib/draft-workflow";
 import { GitHubClient } from "@/lib/github";
 import { addLabelsWithGh, commentIssueWithGh, commentPullRequestWithGh, createIssueWithGh, createPullRequestWithGh, findPullRequestByHeadWithGh, getIssueSnapshotWithGh, updateIssueWithGh } from "@/lib/github-local";
 import { repairIssueStageLabels, transitionIssueStage } from "@/lib/issue-stage";
@@ -58,6 +59,11 @@ export async function createDraftWorkflow(project: ProjectRecord): Promise<Workf
   };
   await saveWorkflow(workflow);
   return workflow;
+}
+
+export async function findOrCreateDraftWorkflow(project: ProjectRecord): Promise<WorkflowRecord> {
+  const existingDraft = latestReusableDraftWorkflow(project.projectId, await listWorkflows());
+  return existingDraft ?? createDraftWorkflow(project);
 }
 
 export async function confirmWorkflowRequirement(workflow: WorkflowRecord, requirement: string, project?: ProjectRecord | null): Promise<WorkflowRecord> {
