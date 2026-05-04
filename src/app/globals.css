@@ -415,27 +415,37 @@ pre,
 
 .project-sidebar-draft {
   margin-top: 10px;
-  padding: 10px;
-  background: #f8fafc;
-  border: 1px solid #e0e7f0;
-  border-radius: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid #edf2f7;
+}
+
+.project-sidebar-draft .handoff-box,
+.project-sidebar-draft .draft-discard-form {
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #edf2f7;
+  border-radius: 0;
+}
+
+.project-sidebar-draft .handoff-box {
+  border-top: 0;
 }
 
 .requirement-tree-item {
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .requirement-tree-item.active {
-  border-color: #bfdbfe;
-  background: #ffffff;
+  background: transparent;
 }
 
 .requirement-tree-link {
   min-height: 46px;
-  padding: 8px 10px;
+  padding: 8px 10px 8px 12px;
   color: inherit;
   border-radius: 8px;
+  border-left: 3px solid transparent;
 }
 
 .requirement-tree-link:hover {
@@ -444,7 +454,8 @@ pre,
 
 .requirement-tree-item.active .requirement-tree-link {
   background: #eff6ff;
-  border-radius: 8px 8px 0 0;
+  border-left-color: #2563eb;
+  border-radius: 8px;
 }
 
 .requirement-tree-topline {
@@ -494,15 +505,23 @@ pre,
 }
 
 .requirement-tree-issues {
-  padding: 8px 8px 8px 18px;
-  background: #f8fafc;
-  border-top: 1px solid #dbeafe;
-  border-radius: 0 0 8px 8px;
+  margin: 4px 0 0 14px;
+  padding: 2px 0 2px 10px;
+  background: transparent;
+  border-left: 1px solid #dbeafe;
+  border-radius: 0;
 }
 
 .requirement-tree-issues .github-issue-row {
-  margin-top: 6px;
-  background: #ffffff;
+  margin-top: 4px;
+  padding: 7px 0 7px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.requirement-tree-issues .github-issue-row:hover {
+  background: #f8fafc;
 }
 
 .project-sidebar-footer {
