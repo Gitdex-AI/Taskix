@@ -358,6 +358,7 @@ function ResolveJobStatusButton({ projectId, jobId, onResolved }: { projectId: s
 
 function findJobSession(job: JobRecord, sessions: AgentSessionRecord[]): AgentSessionRecord | null {
   if (!job.payload.issueId) {
+    if (job.type === "memory_init") return sessions.find((session) => session.sessionKey.endsWith(":memory")) ?? null;
     if (job.type === "workflow_run") return sessions.find((session) => session.role === "planner" && session.workflowId === job.payload.workflowId) ?? null;
     return null;
   }
@@ -374,6 +375,7 @@ function findJobSession(job: JobRecord, sessions: AgentSessionRecord[]): AgentSe
 }
 
 function runningAgentLabel(job: JobRecord, session: AgentSessionRecord | null): string {
+  if (job.type === "memory_init") return "Memory";
   if (job.type === "workflow_run") return "Planner";
   if (job.type === "architect_blocker_run") return "Architect";
   if (job.type === "architect_review_run" || job.type === "merge_run") return "Reviewer";
@@ -389,6 +391,7 @@ function runningAgentLabel(job: JobRecord, session: AgentSessionRecord | null): 
 }
 
 function runningAgentAvatar(job: JobRecord, session: AgentSessionRecord | null): string {
+  if (job.type === "memory_init") return "MM";
   if (job.type === "qa_run") return "QA";
   if (job.type === "issue_run") return "DV";
   if (job.type === "workflow_run") return "PL";
@@ -409,6 +412,7 @@ function runningJobIssueLabel(job: JobRecord, session: AgentSessionRecord | null
   const issueNumber = issue?.githubIssueNumber ?? session?.githubIssueNumber ?? null;
   if (issueNumber) return `issue #${issueNumber}`;
   if (job.payload.issueId) return `issue ${job.payload.issueId}`;
+  if (job.type === "memory_init") return "project memory";
   if (job.type === "workflow_run") return `requirement ${job.payload.workflowId}`;
   return null;
 }

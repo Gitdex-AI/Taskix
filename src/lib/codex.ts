@@ -129,12 +129,14 @@ export class CodexClient {
     projectName: string;
     githubRepo: string;
     message: string;
+    projectMemory?: string | null;
     sessionId?: string | null;
   }): Promise<CodexTextResult> {
     const prompt = `${rolePrompts.product_manager}
 
 Project: ${input.projectName}
 GitHub repo: ${input.githubRepo}
+${input.projectMemory?.trim() ? `\nProject memory from memory.md:\n${input.projectMemory.trim()}\n` : ""}
 
 Conversation rules:
 - Guide the user through requirement discovery as a lightweight brainstorm.
@@ -166,6 +168,75 @@ ${input.message}`;
         sessionId: input.sessionId
       }
     );
+  }
+
+  async readProjectMemory(input: {
+    projectName: string;
+    githubRepo: string;
+  }): Promise<string | null> {
+    const workspaceDir = await this.prepareProjectMemoryWorkspace(input.githubRepo, input.projectName);
+    try {
+      const content = await readFile(path.join(workspaceDir, "memory.md"), "utf8");
+      return trimProjectMemory(content);
+    } catch {
+      return null;
+    }
+  }
+
+  async initializeProjectMemory(input: {
+    projectName: string;
+    githubRepo: string;
+  }): Promise<{ summary: string; memory: string | null; executionLog?: string }> {
+    const workspaceDir = await this.prepareProjectMemoryWorkspace(input.githubRepo, input.projectName);
+    const memoryPath = path.join(workspaceDir, "memory.md");
+    try {
+      const existing = await readFile(memoryPath, "utf8");
+      return { summary: "memory.md already exists.", memory: trimProjectMemory(existing) };
+    } catch {
+      // Continue with initialization.
+    }
+
+    const prompt = `You are initializing Gitdex project memory for future product and agent sessions.
+
+Project: ${input.projectName}
+GitHub repo: ${input.githubRepo}
+Workspace: ${workspaceDir}
+
+Task:
+- Inspect README.md, AGENTS.md, package metadata, and the top-level project structure.
+- Create concise product memory for future PM, planner, developer, QA, reviewer, and DevOps agents.
+- Return ONLY the markdown content for a repo-root file named memory.md.
+
+Rules for memory.md:
+- Keep it under 120 lines.
+- Record stable product context, UX model, workflow model, domain terms, design decisions, constraints, and recent context useful for future requirement discussions.
+- Do not include temporary logs, PR-by-PR history, secrets, or generic engineering rules already covered by AGENTS.md.
+- Use this structure:
+# Gitdex Memory
+
+## Product
+## Users
+## UX Model
+## Workflow Model
+## Domain Terms
+## Design Decisions
+## Constraints
+## Recent Context`;
+
+    const result = await this.runText(prompt, null, { cwd: workspaceDir });
+    if (!result?.text.trim()) {
+      return { summary: "Codex did not produce memory.md content.", memory: null, executionLog: result?.executionLog };
+    }
+    const memory = stripMarkdownFence(stripAgentFinalBlock(result.text)).trim();
+    await writeFile(memoryPath, `${memory}\n`, "utf8");
+    await execFileAsync("git", ["-C", workspaceDir, "add", "memory.md"]);
+    const diff = await gitFact(workspaceDir, ["diff", "--cached", "--name-only"]);
+    if (!diff.includes("memory.md")) {
+      return { summary: "memory.md did not change after initialization.", memory: trimProjectMemory(memory), executionLog: result.executionLog };
+    }
+    await execFileAsync("git", ["-C", workspaceDir, "commit", "-m", "Initialize project memory"]);
+    await execFileAsync("git", ["-C", workspaceDir, "push", "origin", expectedDeveloperBaseBranch()]);
+    return { summary: "Initialized memory.md and pushed it to the project repository.", memory: trimProjectMemory(memory), executionLog: result.executionLog };
   }
 
   async architectChat(input: {
@@ -1075,6 +1146,25 @@ Summarize code review outcome, merge readiness, and deployment status according 
     await checkoutWorkspaceBase(workspaceDir);
     return workspaceDir;
   }
+
+  private async prepareProjectMemoryWorkspace(repo: string, projectName: string): Promise<string> {
+    const workspaceRoot = path.join(dataDir, "gitdex-workspaces");
+    await mkdir(workspaceRoot, { recursive: true });
+    const workspaceDir = path.join(workspaceRoot, sanitizePathSegment(`memory-${projectName}`));
+
+    if (!existsSync(path.join(workspaceDir, ".git"))) {
+      await mkdir(path.dirname(workspaceDir), { recursive: true });
+      await execFileAsync("gh", ["repo", "clone", repo, workspaceDir]);
+    }
+
+    try {
+      await execFileAsync("git", ["-C", workspaceDir, "fetch", "origin", "--prune"]);
+    } catch {
+      // A stale memory clone can still provide an existing memory.md.
+    }
+    await checkoutWorkspaceBase(workspaceDir);
+    return workspaceDir;
+  }
 }
 
 function objectSchema(properties: Record<string, unknown>): object {
@@ -1092,6 +1182,20 @@ function formatCodexExecutionLog(stdout: string, stderr: string): string {
     stderr.trim() ? `stderr\n${stderr.trim()}` : ""
   ].filter(Boolean);
   return sections.join("\n\n");
+}
+
+function trimProjectMemory(content: string): string {
+  return content.trim().slice(0, 12000);
+}
+
+function stripMarkdownFence(content: string): string {
+  const trimmed = content.trim();
+  const match = trimmed.match(/^```(?:md|markdown)?\s*\n([\s\S]*?)\n```$/i);
+  return match ? match[1] : trimmed;
+}
+
+function stripAgentFinalBlock(content: string): string {
+  return content.replace(/\n?GITDEX_AGENT_FINAL\nstatus: (?:pass|fail|blocked)\nsummary: [\s\S]*?\nGITDEX_AGENT_FINAL_END\s*$/m, "").trim();
 }
 
 function withAgentFinalInstruction(prompt: string): string {

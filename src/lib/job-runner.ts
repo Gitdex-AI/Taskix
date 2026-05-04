@@ -1,6 +1,7 @@
 import { architectMergeInstruction, architectReviewInstruction, runWorkflowArchitectReview, runWorkflowMerge } from "@/lib/architect-runner";
 import { architectBlockerInstruction, runArchitectBlockerResolution } from "@/lib/architect-blocker-runner";
 import { appendAgentRunPlaceholder } from "@/lib/agent-run-messages";
+import { CodexClient } from "@/lib/codex";
 import { developerIssueInstruction, plannerWorkflowInstruction, qaValidationInstruction, runWorkflow, runWorkflowIssue, runWorkflowQa, syncWorkflowFromGitHub } from "@/lib/orchestrator";
 import { runWithJobRuntime } from "@/lib/job-runtime";
 import { appendAgentMessages, claimNextPendingJob, claimPendingJob, getAgentSession, getJob, getProject, getWorkflow, saveJob } from "@/lib/store";
@@ -39,7 +40,7 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
 
   try {
     await runWithJobRuntime(job.jobId, async () => {
-      if (!["workflow_run", "issue_run", "qa_run", "architect_blocker_run", "architect_review_run", "merge_run"].includes(job.type)) return;
+      if (!["memory_init", "workflow_run", "issue_run", "qa_run", "architect_blocker_run", "architect_review_run", "merge_run"].includes(job.type)) return;
       const project = job.projectId ? await getProject(job.projectId) : null;
       const workflow = await getWorkflow(job.payload.workflowId);
       if (workflow?.paused) {
@@ -54,7 +55,9 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
         await ensureRunningPlaceholder(project, workflow, job);
         await sleep(1000);
       }
-      if (job.type === "architect_blocker_run" && project && job.payload.sessionKey) {
+      if (job.type === "memory_init" && project) {
+        await runProjectMemoryInit(project);
+      } else if (job.type === "architect_blocker_run" && project && job.payload.sessionKey) {
         await runArchitectBlockerResolution(project, job.payload.sessionKey);
       } else if (job.type === "issue_run" && job.payload.issueId) {
         await runWorkflowIssue(job.payload.workflowId, job.payload.issueId, project);
@@ -72,7 +75,7 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
       } else {
         await runWorkflow(job.payload.workflowId, project);
       }
-      await syncWorkflowFromGitHub(job.payload.workflowId, project);
+      if (job.type !== "memory_init") await syncWorkflowFromGitHub(job.payload.workflowId, project);
     });
     if (!skipped) {
       job.status = "done";
@@ -93,6 +96,35 @@ async function runClaimedJob(job: JobRecord): Promise<{ job: JobRecord | null; r
 
 async function ensureRunningPlaceholder(project: ProjectRecord, workflow: WorkflowRecord, job: JobRecord): Promise<void> {
   const issue = job.payload.issueId ? workflow.issues.find((item) => item.issueId === job.payload.issueId) ?? null : null;
+  if (job.type === "memory_init") {
+    const sessionKey = `${project.projectId}:memory`;
+    const existing = await getAgentSession(sessionKey);
+    const instruction = `Initialize repo-root memory.md for ${project.name} (${project.githubRepo}).`;
+    await appendRunUserInstruction({
+      project,
+      workflow,
+      sessionKey,
+      role: "planner",
+      title: "Memory",
+      content: instruction,
+      sessionId: existing?.sessionId ?? null,
+      currentStep: "initializing project memory",
+      labels: []
+    });
+    await appendAgentRunPlaceholder({
+      project,
+      workflow,
+      job,
+      sessionKey,
+      role: "planner",
+      title: "Memory",
+      label: "Memory",
+      sessionId: existing?.sessionId ?? null,
+      currentStep: "initializing project memory",
+      labels: []
+    });
+    return;
+  }
   if (job.type === "workflow_run") {
     const sessionKey = `${workflow.workflowId}:planner`;
     const existing = await getAgentSession(sessionKey);
@@ -266,6 +298,39 @@ async function ensureRunningPlaceholder(project: ProjectRecord, workflow: Workfl
       labels: blockedSession?.labels ?? []
     });
   }
+}
+
+async function runProjectMemoryInit(project: ProjectRecord): Promise<void> {
+  if (!project.githubRepo) throw new Error("Project has no GitHub repo configured.");
+  const settings = await getSettings();
+  const codex = new CodexClient(settings);
+  const result = await codex.initializeProjectMemory({
+    projectName: project.name,
+    githubRepo: project.githubRepo
+  });
+  await appendAgentMessages({
+    sessionKey: `${project.projectId}:memory`,
+    projectId: project.projectId,
+    role: "planner",
+    title: "Memory",
+    status: result.memory ? "done" : "blocked",
+    currentStep: result.summary,
+    finishedAt: new Date().toISOString(),
+    executionLogs: result.executionLog ? [{
+      title: "Memory initialization Codex execution",
+      content: result.executionLog,
+      createdAt: new Date().toISOString(),
+      status: result.memory ? "ok" : "failed"
+    }] : [],
+    messages: [
+      {
+        role: "assistant",
+        content: result.summary,
+        createdAt: new Date().toISOString()
+      }
+    ]
+  });
+  if (!result.memory) throw new Error(result.summary);
 }
 
 async function appendRunUserInstruction(input: {

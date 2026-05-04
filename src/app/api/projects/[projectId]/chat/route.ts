@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { CodexClient } from "@/lib/codex";
 import { chatRoleLabel, parseChatTarget } from "@/lib/chat-routing";
 import { findOrCreateDraftWorkflow } from "@/lib/orchestrator";
+import { runJobById } from "@/lib/job-runner";
 import { getSettings } from "@/lib/settings";
-import { appendAgentMessages, getAgentSession, getProject, getWorkflow, saveProject } from "@/lib/store";
+import { appendAgentMessages, createJob, getAgentSession, getProject, getWorkflow, saveProject } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 export async function POST(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
@@ -36,6 +37,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     : `${project.projectId}:${role}`;
   const existing = await getAgentSession(sessionKey);
   const codex = new CodexClient(settings);
+  let projectMemory: string | null = null;
+  const isFirstPmMessage = role === "product_manager" && workflowId && !existing?.messages.length;
+  if (isFirstPmMessage) {
+    projectMemory = await codex.readProjectMemory({ projectName: project.name, githubRepo: project.githubRepo });
+    if (!projectMemory) {
+      const memoryJob = await createJob({
+        projectId: project.projectId,
+        type: "memory_init",
+        payload: { workflowId }
+      });
+      await runJobById(memoryJob.jobId, project.projectId);
+      projectMemory = await codex.readProjectMemory({ projectName: project.name, githubRepo: project.githubRepo });
+    }
+  }
   const currentSessionId = role === "product_manager" && workflowId
     ? existing?.sessionId ?? null
     : role === "product_manager"
@@ -45,7 +60,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
         : project.devopsSessionId;
   const codexStartedAt = Date.now();
   const result = role === "product_manager"
-    ? await codex.projectManagerChat({ projectName: project.name, githubRepo: project.githubRepo, message, sessionId: currentSessionId ?? existing?.sessionId })
+    ? await codex.projectManagerChat({ projectName: project.name, githubRepo: project.githubRepo, message, projectMemory, sessionId: currentSessionId ?? existing?.sessionId })
     : role === "architect"
       ? await codex.architectChat({ projectName: project.name, githubRepo: project.githubRepo, message, sessionId: currentSessionId ?? existing?.sessionId })
       : await codex.devopsChat({ projectName: project.name, githubRepo: project.githubRepo, message, sessionId: currentSessionId ?? existing?.sessionId });

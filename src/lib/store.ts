@@ -268,8 +268,8 @@ export async function claimNextPendingJob(projectId?: string): Promise<JobRecord
   db.exec("BEGIN IMMEDIATE");
   try {
     const row = projectId
-      ? db.prepare("SELECT job_id, payload FROM jobs WHERE status = 'pending' AND project_id = ? ORDER BY CASE type WHEN 'architect_blocker_run' THEN 0 WHEN 'issue_run' THEN 1 WHEN 'qa_run' THEN 2 WHEN 'architect_review_run' THEN 3 WHEN 'merge_run' THEN 4 ELSE 5 END, created_at ASC LIMIT 1").get(projectId) as { job_id: string; payload: string } | undefined
-      : db.prepare("SELECT job_id, payload FROM jobs WHERE status = 'pending' ORDER BY CASE type WHEN 'architect_blocker_run' THEN 0 WHEN 'issue_run' THEN 1 WHEN 'qa_run' THEN 2 WHEN 'architect_review_run' THEN 3 WHEN 'merge_run' THEN 4 ELSE 5 END, created_at ASC LIMIT 1").get() as { job_id: string; payload: string } | undefined;
+      ? db.prepare("SELECT job_id, payload FROM jobs WHERE status = 'pending' AND project_id = ? ORDER BY CASE type WHEN 'memory_init' THEN 0 WHEN 'architect_blocker_run' THEN 1 WHEN 'issue_run' THEN 2 WHEN 'qa_run' THEN 3 WHEN 'architect_review_run' THEN 4 WHEN 'merge_run' THEN 5 ELSE 6 END, created_at ASC LIMIT 1").get(projectId) as { job_id: string; payload: string } | undefined
+      : db.prepare("SELECT job_id, payload FROM jobs WHERE status = 'pending' ORDER BY CASE type WHEN 'memory_init' THEN 0 WHEN 'architect_blocker_run' THEN 1 WHEN 'issue_run' THEN 2 WHEN 'qa_run' THEN 3 WHEN 'architect_review_run' THEN 4 WHEN 'merge_run' THEN 5 ELSE 6 END, created_at ASC LIMIT 1").get() as { job_id: string; payload: string } | undefined;
     if (!row) {
       db.exec("COMMIT");
       return null;
