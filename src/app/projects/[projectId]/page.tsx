@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Alert, Badge, Button, Code, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { Archive, FolderKanban, GitBranch, Info, ListTodo, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle, Wrench } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
@@ -256,7 +257,7 @@ function RequirementPanelRow({ projectId, workflow, jobs }: { projectId: string;
     <div className="requirement-row">
       <div className="requirement-row-body">
         <div className="requirement-row-main">
-          <a href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`} className="requirement-row-link">
+          <Link href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`} className="requirement-row-link">
             <Group gap="xs">
               <Code>{workflow.trackingCode ?? workflow.workflowId}</Code>
               <Badge size="xs" variant="light" color={status.color}>{status.label}</Badge>
@@ -265,7 +266,7 @@ function RequirementPanelRow({ projectId, workflow, jobs }: { projectId: string;
             </Group>
             <Text size="sm" mt={6} lineClamp={2}>{workflow.userRequirement}</Text>
             <Text size="xs" c="dimmed" mt={4}>{workflow.archivedAt ? `Archived ${formatDate(workflow.archivedAt)}` : `Created ${formatDate(workflow.createdAt)}`}</Text>
-          </a>
+          </Link>
         </div>
         <Group gap={6} justify="flex-end" wrap="nowrap">
           {!workflow.archivedAt ? renderRequirementRunAction(projectId, planningJob) : null}
@@ -357,7 +358,7 @@ function ProjectWorkspaceSidebar(input: {
         <div className="project-sidebar-section">
           <Group justify="space-between" gap="xs" mb="xs" wrap="nowrap">
             <Text size="xs" fw={820} tt="uppercase" c="dimmed">Requirements</Text>
-            <Button component="a" href={`/projects/${project.projectId}?panel=requirements`} variant={input.activePanel === "requirements" ? "light" : "subtle"} size="compact-xs" radius="xl">
+            <Button component={Link} href={`/projects/${project.projectId}?panel=requirements`} variant={input.activePanel === "requirements" ? "light" : "subtle"} size="compact-xs" radius="xl">
               View all
             </Button>
           </Group>
@@ -385,7 +386,7 @@ function ProjectWorkspaceSidebar(input: {
           <Group gap={4} wrap="nowrap">
             <ProjectSyncForm projectId={project.projectId} compact />
             <Button
-              component="a"
+              component={Link}
               href={`/projects/${project.projectId}?panel=projects`}
               variant={input.activePanel === "projects" ? "light" : "subtle"}
               size="compact-xs"
@@ -396,7 +397,7 @@ function ProjectWorkspaceSidebar(input: {
               <FolderKanban size={16} />
             </Button>
             <Button
-              component="a"
+              component={Link}
               href={`/projects/${project.projectId}?panel=tools`}
               variant={input.activePanel === "tools" ? "light" : "subtle"}
               size="compact-xs"
@@ -407,7 +408,7 @@ function ProjectWorkspaceSidebar(input: {
               <Wrench size={16} />
             </Button>
             <Button
-              component="a"
+              component={Link}
               href={`/projects/${project.projectId}/github-triage`}
               variant="subtle"
               size="compact-xs"
@@ -417,7 +418,7 @@ function ProjectWorkspaceSidebar(input: {
             >
               <ListTodo size={16} />
             </Button>
-            <Button component="a" href={`/projects/${project.projectId}?panel=settings`} variant={input.activePanel === "settings" ? "light" : "subtle"} size="compact-xs" radius="xl" title="Settings" aria-label="Settings">
+            <Button component={Link} href={`/projects/${project.projectId}?panel=settings`} variant={input.activePanel === "settings" ? "light" : "subtle"} size="compact-xs" radius="xl" title="Settings" aria-label="Settings">
               <Settings size={16} />
             </Button>
           </Group>
@@ -455,13 +456,13 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
         <div className="requirement-tree-link">
           <div className="requirement-tree-topline">
             <div className="requirement-tree-title-actions">
-              <a
+              <Link
                 href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
                 className="requirement-tree-main-link"
               >
                 <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
                 <Badge size="xs" color={status.color} variant="light">{status.label}</Badge>
-              </a>
+              </Link>
               <RequirementDetailPanel projectId={projectId} workflow={workflow} status={status} planningJob={planningJob} />
             </div>
             <Group gap={6} justify="flex-end" wrap="nowrap">
@@ -477,12 +478,12 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
               ) : null}
             </Group>
           </div>
-          <a
+          <Link
             href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`}
             className="requirement-tree-summary-link"
           >
             <Text className="requirement-tree-summary" size="sm" c="dimmed" lineClamp={3}>{workflow.userRequirement}</Text>
-          </a>
+          </Link>
         </div>
         {active ? (
           <div className="requirement-tree-issues">
@@ -677,7 +678,7 @@ function renderStepRecovery(input: {
           {blockedSessions.map((session) => (
             <Button
               key={session.sessionKey}
-              component="a"
+              component={Link}
               href={`/projects/${input.projectId}?session=${encodeURIComponent(session.sessionKey)}`}
               variant="light"
               color="red"
@@ -721,10 +722,10 @@ function renderRequirementRows(projectId: string, workflows: WorkflowRecord[], j
       <div key={workflow.workflowId} className="requirement-row">
         <div className="requirement-row-body">
           <div className="requirement-row-main">
-            <a href={`/projects/${projectId}/workflows/${workflow.workflowId}`} className="requirement-row-link">
+            <Link href={`/projects/${projectId}/workflows/${workflow.workflowId}`} className="requirement-row-link">
               <Text size="sm" fw={780} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
               <Text size="xs" c="dimmed" mt={3} lineClamp={2}>{workflow.userRequirement}</Text>
-            </a>
+            </Link>
           </div>
           <div className="requirement-row-actions">
             <Badge className="requirement-status-badge" size="xs" variant="light" color={status.color}>{status.label}</Badge>
@@ -796,7 +797,7 @@ function renderWorkflowActionRows(projectId: string, workflows: WorkflowRecord[]
       </div>
       <Group gap={6} wrap="nowrap">
         <Button
-          component="a"
+          component={Link}
           href={`/projects/${projectId}/workflows/${workflow.workflowId}`}
           variant="light"
           size="compact-xs"
@@ -1120,13 +1121,13 @@ function renderMergeIssueRows(projectId: string, workflows: WorkflowRecord[]): R
 function renderCompletedWorkflowRows(projectId: string, workflows: WorkflowRecord[]): ReactNode {
   if (!workflows.length) return <Text size="xs" c="dimmed">No completed workflows yet.</Text>;
   return workflows.slice(0, 6).map((workflow) => (
-    <a key={workflow.workflowId} href={`/projects/${projectId}/workflows/${workflow.workflowId}`} className="completed-workflow-row">
+    <Link key={workflow.workflowId} href={`/projects/${projectId}/workflows/${workflow.workflowId}`} className="completed-workflow-row">
       <Group justify="space-between" wrap="nowrap">
         <Text size="sm" fw={700} lineClamp={1}>{workflow.trackingCode ?? workflow.workflowId}</Text>
         <Badge size="xs" variant="light">done</Badge>
       </Group>
       <Text size="xs" c="dimmed" lineClamp={1}>{workflow.userRequirement}</Text>
-    </a>
+    </Link>
   ));
 }
 
@@ -1150,7 +1151,7 @@ function IssueStatusRow({ issue, qaStatus, action = null }: { issue: IssueRecord
 
 function SessionLink({ session, archived = false }: { session: AgentSessionRecord; archived?: boolean }) {
   return (
-    <a href={`/projects/${session.projectId}?session=${encodeURIComponent(session.sessionKey)}`} className={`session-row${archived ? " archived" : ""}`}>
+    <Link href={`/projects/${session.projectId}?session=${encodeURIComponent(session.sessionKey)}`} className={`session-row${archived ? " archived" : ""}`}>
       <Group justify="space-between" align="center" wrap="nowrap">
         <div>
           <Text size="sm" fw={720} lineClamp={1}>{session.title}</Text>
@@ -1165,7 +1166,7 @@ function SessionLink({ session, archived = false }: { session: AgentSessionRecor
       </Group>
       {session.currentStep ? <Text size="xs" c="dimmed" lineClamp={1}>{session.currentStep}</Text> : null}
       {session.ownedPaths?.length ? <Text size="xs" c="dimmed" lineClamp={1}>Paths: {session.ownedPaths.join(", ")}</Text> : null}
-    </a>
+    </Link>
   );
 }
 
