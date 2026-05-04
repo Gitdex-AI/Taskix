@@ -148,6 +148,20 @@ test("active project workspace projects nav ignores stale prior destinations", (
   });
 });
 
+test("active project workspace requirements nav returns to the same project workspace", () => {
+  const action = resolveProjectWorkspacePanelNavAction({
+    projectId: "project-a",
+    panel: "requirements",
+    activePanel: "requirements"
+  });
+
+  assert.deepEqual(action, {
+    href: "/projects/project-a",
+    active: true,
+    action: "return"
+  });
+});
+
 test("inactive project workspace panel nav opens the requested panel for the same project", () => {
   const action = resolveProjectWorkspacePanelNavAction({
     projectId: "project-a",

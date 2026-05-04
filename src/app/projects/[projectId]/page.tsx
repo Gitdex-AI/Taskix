@@ -313,6 +313,7 @@ function ProjectWorkspaceSidebar(input: {
   const project = input.project;
   const draftWorkflow = input.requirementWorkflows.find((workflow) => isDiscardableDraftWorkflow(project.projectId, workflow)) ?? null;
   const projectsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "projects", activePanel: input.activePanel });
+  const requirementsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "requirements", activePanel: input.activePanel });
   const toolsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "tools", activePanel: input.activePanel });
   const settingsPanelAction = resolveProjectWorkspacePanelNavAction({ projectId: project.projectId, panel: "settings", activePanel: input.activePanel });
 
@@ -360,8 +361,9 @@ function ProjectWorkspaceSidebar(input: {
           <Group justify="space-between" gap="xs" mb="xs" wrap="nowrap">
             <Text size="xs" fw={820} tt="uppercase" c="dimmed">Requirements</Text>
             <Link
-              href={`/projects/${project.projectId}?panel=requirements`}
-              className={`sidebar-pill-link${input.activePanel === "requirements" ? " active" : ""}`}
+              href={requirementsPanelAction.href}
+              className={`sidebar-pill-link${requirementsPanelAction.active ? " active" : ""}`}
+              data-nav-action={requirementsPanelAction.action}
             >
               View all
             </Link>
