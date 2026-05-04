@@ -19,7 +19,7 @@ export function ProjectAutoSync({ projectId }: { projectId: string }) {
         if (response.ok) router.refresh();
       })
       .catch(() => {
-        // Manual Sync GitHub remains available when background sync fails.
+        // GitHub triage exposes the manual refresh path when background sync fails.
       });
   }, [projectId, router]);
 

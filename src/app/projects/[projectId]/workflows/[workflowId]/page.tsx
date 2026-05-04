@@ -4,7 +4,6 @@ import { ArrowLeft, Bot, CheckCircle2, CircleDot, GitPullRequest, Play, RefreshC
 import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
 import { ProjectRetryJobButton } from "@/components/ProjectRetryJobButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
-import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { WorkflowPauseButton } from "@/components/WorkflowPauseButton";
 import { requireConsolePageAuth } from "@/lib/console-auth";
 import { getIssueQaStatus } from "@/lib/qa-status";
@@ -45,7 +44,6 @@ export default async function WorkflowDetailPage({
         </div>
         <Group gap="xs">
           <ProjectRunJobsForm projectId={project.projectId} />
-          <ProjectSyncForm projectId={project.projectId} />
           <WorkflowPauseButton workflowId={workflow.workflowId} paused={Boolean(workflow.paused)} />
         </Group>
       </Group>

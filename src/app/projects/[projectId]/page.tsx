@@ -18,7 +18,6 @@ import { ProjectReturnToDeveloperButton } from "@/components/ProjectReturnToDeve
 import { ProjectRunDeveloperIssueButton } from "@/components/ProjectRunDeveloperIssueButton";
 import { ProjectRunJobButton } from "@/components/ProjectRunJobButton";
 import { ProjectRunJobsForm } from "@/components/ProjectRunJobsForm";
-import { ProjectSyncForm } from "@/components/ProjectSyncForm";
 import { RequirementDetailPanel } from "@/components/RequirementDetailPanel";
 import { ProjectSwitcher } from "@/components/ProjectSwitcher";
 import { ProjectsPanel } from "@/components/projects/ProjectsPanel";
@@ -598,8 +597,7 @@ function buildWorkflowStepDetails(input: {
           title: "Recover planner job",
           reason: recoveryReasonForJobs(planningJobs),
           jobs: planningJobs,
-          sessions: input.sessions.filter((session) => session.role === "planner"),
-          syncLabel: "Sync planning state"
+          sessions: input.sessions.filter((session) => session.role === "planner")
         })}
         {input.queuedWorkflow ? (
           <Alert icon={<GitBranch size={16} />} color="blue" variant="light">
@@ -622,8 +620,7 @@ function buildWorkflowStepDetails(input: {
           title: "Recover developer PR",
           reason: recoveryReasonForDeveloperStep(input.visibleActiveWorkflows, developerJobs, developerSessions),
           jobs: developerJobs,
-          sessions: developerSessions,
-          syncLabel: "Recover PR from GitHub"
+          sessions: developerSessions
         })}
         {renderStepRunAction(input.projectId, input.jobs, "issue_run", "Run Developer Jobs")}
         {renderJobRows(input.projectId, developerJobs, input.queuedJobId)}
@@ -638,8 +635,7 @@ function buildWorkflowStepDetails(input: {
           title: "Recover QA validation",
           reason: recoveryReasonForQaStep(input.activeWorkflows, qaSessions),
           jobs: [],
-          sessions: qaSessions,
-          syncLabel: "Sync QA labels"
+          sessions: qaSessions
         })}
         {renderStepRunAction(input.projectId, input.jobs, "qa_run", "Run QA Jobs")}
         {renderJobRows(input.projectId, qaJobs, input.queuedJobId)}
@@ -654,8 +650,7 @@ function buildWorkflowStepDetails(input: {
           title: "Recover merge readiness",
           reason: recoveryReasonForMergeStep(input.activeWorkflows),
           jobs: [],
-          sessions: [],
-          syncLabel: "Sync merge state"
+          sessions: []
         })}
         {renderMergeIssueRows(input.projectId, input.activeWorkflows)}
       </Stack>
@@ -674,7 +669,6 @@ function renderStepRecovery(input: {
   reason: string | null;
   jobs: JobRecord[];
   sessions: AgentSessionRecord[];
-  syncLabel: string;
 }): ReactNode {
   if (!input.reason) return null;
   const failedJobs = input.jobs.filter((job) => job.status === "failed");
@@ -690,7 +684,6 @@ function renderStepRecovery(input: {
           </Group>
           <Text size="xs" c="dimmed" mt={3}>{input.reason}</Text>
         </div>
-        <ProjectSyncForm projectId={input.projectId} label={input.syncLabel} compact />
       </Group>
       {failedJobs.length || blockedSessions.length ? (
         <Group gap={6} mt="xs">
