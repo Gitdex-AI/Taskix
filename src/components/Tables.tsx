@@ -11,9 +11,8 @@ import {
   TableTr,
   Text
 } from "@mantine/core";
-import { ProjectDeleteForm } from "@/components/ProjectDeleteForm";
 import { getWorkflowQaStatus } from "@/lib/qa-status";
-import type { ProjectRecord, WorkflowRecord } from "@/lib/types";
+import type { WorkflowRecord } from "@/lib/types";
 
 export function WorkflowsTable({ workflows }: { workflows: WorkflowRecord[] }) {
   return (
@@ -78,77 +77,6 @@ function WorkflowRow({ workflow }: { workflow: WorkflowRecord }) {
         </Text>
       </TableTd>
     </TableTr>
-  );
-}
-
-type ProjectTableRecord = ProjectRecord & { latestAt?: string };
-
-export function ProjectsTable({ projects }: { projects: ProjectTableRecord[] }) {
-  return (
-    <TableScrollContainer minWidth={780}>
-      <Table highlightOnHover verticalSpacing="sm">
-        <TableThead>
-          <TableTr>
-            <TableTh>Slug</TableTh>
-            <TableTh>Name</TableTh>
-            <TableTh>Latest</TableTh>
-            <TableTh>Account</TableTh>
-            <TableTh>Repo</TableTh>
-            <TableTh>Deploy</TableTh>
-            <TableTh>PM Session</TableTh>
-            <TableTh>Delete</TableTh>
-          </TableTr>
-        </TableThead>
-        <TableTbody>
-          {projects.length ? (
-            projects.map((project) => (
-              <TableTr key={project.projectId} className="clickable-row">
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>
-                    <Code>{project.slug}</Code>
-                  </a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>{project.name}</a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>
-                    <Text size="sm" c="dimmed">{formatDateTime(project.latestAt ?? project.createdAt)}</Text>
-                  </a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>{project.githubAccount}</a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>{project.githubRepo}</a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>
-                    <Badge color={project.autoDeploy ? "green" : "gray"} variant="light">
-                      {project.autoDeploy ? "auto" : "manual"}
-                    </Badge>
-                  </a>
-                </TableTd>
-                <TableTd>
-                  <a className="row-link" href={`/projects/${project.projectId}`}>{project.projectManagerSessionId ?? "new"}</a>
-                </TableTd>
-                <TableTd>
-                  <ProjectDeleteForm projectId={project.projectId} slug={project.slug} compact />
-                </TableTd>
-              </TableTr>
-            ))
-          ) : (
-            <TableTr>
-              <TableTd colSpan={8}>
-                <Text c="dimmed" ta="center" py="md">
-                  No projects yet.
-                </Text>
-              </TableTd>
-            </TableTr>
-          )}
-        </TableTbody>
-      </Table>
-    </TableScrollContainer>
   );
 }
 

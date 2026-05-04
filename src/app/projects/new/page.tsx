@@ -14,7 +14,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <Button component="a" href="/projects" variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} mb="sm">
+      <Button component="a" href="/" variant="subtle" size="compact-sm" leftSection={<ArrowLeft size={14} />} mb="sm">
         Back to workspace
       </Button>
       <PageTitle title="Add Project" />

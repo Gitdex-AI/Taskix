@@ -45,7 +45,7 @@ test("return destination uses stable fallback when no prior page or project chat
   });
 
   assert.deepEqual(destination, {
-    href: "/projects",
+    href: "/",
     source: "fallback"
   });
 });
@@ -129,20 +129,6 @@ test("active project workspace panel nav preserves encoded project id", () => {
 
   assert.deepEqual(action, {
     href: "/projects/project%2Fa",
-    active: true,
-    action: "return"
-  });
-});
-
-test("active project workspace projects nav ignores stale prior destinations", () => {
-  const action = resolveProjectWorkspacePanelNavAction({
-    projectId: "project-a",
-    panel: "projects",
-    activePanel: "projects"
-  });
-
-  assert.deepEqual(action, {
-    href: "/projects/project-a",
     active: true,
     action: "return"
   });

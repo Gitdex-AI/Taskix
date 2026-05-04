@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteProject, getProject } from "@/lib/store";
+import { deleteProject, getProject, listProjects } from "@/lib/store";
 import { requireConsoleApiAuth } from "@/lib/console-auth";
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ projectId: string }> }) {
@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   if (action !== "delete") return redirect(request, `/projects/${projectId}?error=${encodeURIComponent("Unsupported project action.")}`);
 
   const project = await getProject(projectId);
-  if (!project) return redirect(request, `/projects?error=${encodeURIComponent("Project not found.")}`);
+  if (!project) return redirect(request, `/?error=${encodeURIComponent("Project not found.")}`);
 
   const confirmation = String(form.get("confirmation") ?? "").trim();
   if (confirmation !== project.slug) {
@@ -28,7 +28,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
   }
 
   await deleteProject(project.projectId);
-  return redirect(request, `/projects?message=${encodeURIComponent(`Project ${project.name} deleted locally.`)}`);
+  const latestProject = (await listProjects())
+    .slice()
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0];
+  const message = `Project ${project.name} deleted locally.`;
+  return redirect(request, latestProject ? `/projects/${latestProject.projectId}?message=${encodeURIComponent(message)}` : `/projects/new?error=${encodeURIComponent(message)}`);
 }
 
 function redirect(request: Request, location: string): NextResponse {

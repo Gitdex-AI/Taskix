@@ -21,9 +21,9 @@ export type ConsoleNavAction = {
   action: "open" | "return";
 };
 
-export type ProjectWorkspacePanel = "projects" | "tools" | "settings" | "requirements";
+export type ProjectWorkspacePanel = "tools" | "settings" | "requirements";
 
-export const defaultConsoleReturnHref = "/projects";
+export const defaultConsoleReturnHref = "/";
 
 const nonChatConsolePaths = new Set(["/projects", "/projects/new", "/settings", "/tools"]);
 

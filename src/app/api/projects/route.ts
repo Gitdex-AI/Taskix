@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     agentsFilePath,
     updateAgentsFile
   });
-  return redirect(request, `/projects?message=${encodeURIComponent(`Project ${project.name} created. Telegram users can switch with /use ${project.slug}.`)}`);
+  return redirect(request, `/projects/${project.projectId}?message=${encodeURIComponent(`Project ${project.name} created. Telegram users can switch with /use ${project.slug}.`)}`);
 }
 
 function validateProject(name: string, repo: string, account: string, agentsFilePath: string): string | null {
