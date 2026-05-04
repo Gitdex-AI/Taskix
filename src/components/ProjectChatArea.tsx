@@ -280,7 +280,7 @@ function RunningAgentMessages({ jobs, sessions, workflows }: { jobs: JobRecord[]
         const issueLabel = runningJobIssueLabel(job, session, workflows);
         const startedAt = job.runtime?.startedAt ?? job.updatedAt ?? job.createdAt;
         const elapsed = formatElapsed(startedAt);
-        const outputTail = job.runtime?.outputTail?.trimEnd();
+        const outputTail = stripAgentFinalBlocks(job.runtime?.outputTail ?? "").trimEnd();
         return (
           <div key={job.jobId} className="chat-message assistant pending" aria-live="polite">
             <div className="chat-avatar">{runningAgentAvatar(job, session)}</div>
@@ -331,7 +331,7 @@ function RunningAgentLog({ label, output }: { label: string; output: string }) {
 
 function MessageLiveOutput({ message, jobs }: { message: TimelineMessage; jobs: JobRecord[] }) {
   const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
-  const outputTail = job?.runtime?.outputTail?.trimEnd();
+  const outputTail = stripAgentFinalBlocks(job?.runtime?.outputTail ?? "").trimEnd();
   if (outputTail) return <RunningAgentLog label={message.sourceLabel} output={outputTail} />;
   return (
     <Text size="xs" c="dimmed" className="running-agent-waiting">
@@ -664,7 +664,7 @@ function ExecutionLogItem({ log }: { log: TimelineExecutionLog }) {
             </Group>
             <Text size="sm" fw={760} mt={6}>{log.title}</Text>
           </summary>
-          <pre className="execution-log-content">{log.content || "No Codex execution output captured."}</pre>
+          <pre className="execution-log-content">{stripAgentFinalBlocks(log.content) || "No Codex execution output captured."}</pre>
         </details>
       </div>
     </div>
@@ -687,7 +687,7 @@ function InlineExecutionLogs({ logs }: { logs: TimelineExecutionLog[] }) {
               </Text>
             </Group>
           </summary>
-          <pre className="execution-log-content">{log.content || "No Codex execution output captured."}</pre>
+          <pre className="execution-log-content">{stripAgentFinalBlocks(log.content) || "No Codex execution output captured."}</pre>
         </details>
       ))}
     </div>
@@ -709,6 +709,10 @@ function chatAvatarText(message: TimelineMessage | TimelineExecutionLog): string
   const avatar = chatAvatarForRole(message.sourceRole);
   if (avatar) return avatar;
   return message.kind === "message" && message.role === "assistant" ? "A" : "S";
+}
+
+function stripAgentFinalBlocks(content: string): string {
+  return content.replace(/\n?GITDEX_AGENT_FINAL\s+status:\s*(?:pass|fail|blocked)\s+summary:\s*[\s\S]*?GITDEX_AGENT_FINAL_END\s*/g, "").trim();
 }
 
 function chatAvatarForRole(role: AgentSessionRecord["role"]): string {

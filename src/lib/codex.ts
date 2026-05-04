@@ -952,7 +952,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
     const result = await this.runCodex(args, { cwd: options.cwd });
     if (!result.ok) return null;
     try {
-      return { text: (await readFile(outputPath, "utf8")).trim(), sessionId: extractSessionId(result.stderr) ?? sessionId, executionLog: formatCodexExecutionLog(result.stdout, result.stderr) };
+      return { text: stripAgentFinalBlock(await readFile(outputPath, "utf8")).trim(), sessionId: extractSessionId(result.stderr) ?? sessionId, executionLog: formatCodexExecutionLog(result.stdout, result.stderr) };
     } catch {
       return null;
     }
@@ -1177,9 +1177,11 @@ function extractSessionId(stderr: string): string | null {
 }
 
 function formatCodexExecutionLog(stdout: string, stderr: string): string {
+  const displayStdout = stripAgentFinalBlock(stdout).trim();
+  const displayStderr = stripAgentFinalBlock(stderr).trim();
   const sections = [
-    stdout.trim() ? `stdout\n${stdout.trim()}` : "",
-    stderr.trim() ? `stderr\n${stderr.trim()}` : ""
+    displayStdout ? `stdout\n${displayStdout}` : "",
+    displayStderr ? `stderr\n${displayStderr}` : ""
   ].filter(Boolean);
   return sections.join("\n\n");
 }
@@ -1195,7 +1197,7 @@ function stripMarkdownFence(content: string): string {
 }
 
 function stripAgentFinalBlock(content: string): string {
-  return content.replace(/\n?GITDEX_AGENT_FINAL\nstatus: (?:pass|fail|blocked)\nsummary: [\s\S]*?\nGITDEX_AGENT_FINAL_END\s*$/m, "").trim();
+  return content.replace(/\n?GITDEX_AGENT_FINAL\s+status:\s*(?:pass|fail|blocked)\s+summary:\s*[\s\S]*?GITDEX_AGENT_FINAL_END\s*/g, "").trim();
 }
 
 function withAgentFinalInstruction(prompt: string): string {
