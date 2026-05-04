@@ -395,13 +395,15 @@ function renderRequirementTreeRows(projectId: string, workflows: WorkflowRecord[
           <div className="requirement-tree-issues">
             <Group justify="space-between" align="center" gap="xs" mb="xs" wrap="nowrap">
               <Text size="xs" fw={820} tt="uppercase" c="dimmed">Issues</Text>
-              <ProjectAutoRunIssuesButton
-                projectId={projectId}
-                workflowIds={[workflow.workflowId]}
-                issueIds={workflow.issues.map((issue) => issue.issueId)}
-                initialState={autoRunState}
-                runningLabel={activeAutoRunLabel(jobs, [workflow])}
-              />
+              {workflow.issues.length ? (
+                <ProjectAutoRunIssuesButton
+                  projectId={projectId}
+                  workflowIds={[workflow.workflowId]}
+                  issueIds={workflow.issues.map((issue) => issue.issueId)}
+                  initialState={autoRunState}
+                  runningLabel={activeAutoRunLabel(jobs, [workflow])}
+                />
+              ) : null}
             </Group>
             {renderGithubIssueRows(projectId, [workflow], sessions, jobs, queuedJobId, autoRunState)}
           </div>
