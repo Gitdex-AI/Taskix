@@ -185,21 +185,23 @@ function WorkspacePanelContent({ panel, project, projects, workflows, jobs, ghUs
   const guardSettingsReturn = shouldGuardWorkspaceSettingsReturn({ panel });
   return (
     <div className="workspace-panel-content">
-      <Group justify="flex-start" mb="md">
-        <Button
-          component="a"
-          href={workspaceHref}
-          variant="subtle"
-          leftSection={<ArrowLeft size={16} />}
-          data-settings-return-action={guardSettingsReturn ? true : undefined}
-        >
-          Back to workspace
-        </Button>
-      </Group>
-      {panel === "tools" ? <ToolsPanel /> : null}
-      {panel === "settings" ? <SettingsPanel message={message} error={error} returnTo={returnTo} toolsHref={`${workspaceHref}?panel=tools`} /> : null}
-      {panel === "requirements" ? <RequirementsPanelContent project={project} workflows={workflows} jobs={jobs} message={message} error={error} /> : null}
-      {panel === "triage" ? <ProjectGitHubTriagePanel project={project} ghUserLogin={ghUserLogin} /> : null}
+      <div className="workspace-panel-inner">
+        <Group justify="flex-start" mb="md">
+          <Button
+            component="a"
+            href={workspaceHref}
+            variant="subtle"
+            leftSection={<ArrowLeft size={16} />}
+            data-settings-return-action={guardSettingsReturn ? true : undefined}
+          >
+            Back to workspace
+          </Button>
+        </Group>
+        {panel === "tools" ? <ToolsPanel /> : null}
+        {panel === "settings" ? <SettingsPanel message={message} error={error} returnTo={returnTo} toolsHref={`${workspaceHref}?panel=tools`} /> : null}
+        {panel === "requirements" ? <RequirementsPanelContent project={project} workflows={workflows} jobs={jobs} message={message} error={error} /> : null}
+        {panel === "triage" ? <ProjectGitHubTriagePanel project={project} ghUserLogin={ghUserLogin} /> : null}
+      </div>
     </div>
   );
 }

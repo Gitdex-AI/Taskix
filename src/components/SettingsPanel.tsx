@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Checkbox, Code, Group, NumberInput, Paper, PasswordInput, SimpleGrid, Text, TextInput, Textarea } from "@mantine/core";
+import { Alert, Badge, Button, Checkbox, Code, Group, NumberInput, PasswordInput, SimpleGrid, Text, TextInput, Textarea } from "@mantine/core";
 import { GitBranch, Info, KeyRound, Save, Trash2, Webhook, Wrench } from "lucide-react";
 import { PageTitle } from "@/components/PageTitle";
 import { ThemeSelector } from "@/components/theme/ThemeSelector";
@@ -19,102 +19,104 @@ export async function SettingsPanel({
   const hasGitHubKey = Boolean(settings.githubUsername && settings.githubSshPrivateKeyPath && settings.githubSshPublicKey);
 
   return (
-    <>
+    <div className="settings-panel">
       <PageTitle title="Settings" />
+      <div className="settings-page-heading">
+        <Text className="settings-page-title">Settings</Text>
+        <Text size="sm" c="dimmed">
+          Configure local workspace behavior and integration defaults.
+        </Text>
+      </div>
       {(message || error) && (
         <Alert color={error ? "red" : "blue"} icon={<Info size={16} />} mb="md">
           {message ?? error}
         </Alert>
       )}
-      <Paper mb="md">
-        <Group justify="space-between" p="md">
-          <div>
-            <Text fw={760}>Appearance</Text>
-            <Text size="sm" c="dimmed">
-              Switch between system, light, and dark themes.
-            </Text>
+      <section className="settings-section">
+        <div className="settings-row">
+          <div className="settings-row-copy">
+            <Text className="settings-row-title">Appearance</Text>
+            <Text className="settings-row-description">Switch between system, light, and dark themes.</Text>
           </div>
           <ThemeSelector />
-        </Group>
-      </Paper>
-      <Paper mb="md">
-        <Group justify="space-between" p="md">
-          <div>
-            <Text fw={760}>Tool Checks</Text>
-            <Text size="sm" c="dimmed">
-              Codex and GitHub CLI checks live on a dedicated Tools page.
-            </Text>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-row">
+          <div className="settings-row-copy">
+            <Text className="settings-row-title">Tool Checks</Text>
+            <Text className="settings-row-description">Codex and GitHub CLI checks live on a dedicated Tools page.</Text>
           </div>
           <Button component="a" href={toolsHref} variant="light" leftSection={<Wrench size={16} />}>
             Open Tools
           </Button>
-        </Group>
-      </Paper>
-      <Paper mb="md">
-        <Group justify="space-between" p="md" className="section-header">
-          <div>
-            <Text fw={760}>GitHub Owner</Text>
-            <Badge color={hasGitHubKey ? "green" : "yellow"} variant="light">
-              {hasGitHubKey ? "key ready" : "setup required"}
-            </Badge>
-            <Text size="sm" c="dimmed">
-              Configure a GitHub user or organization owner before adding projects.
-            </Text>
-          </div>
-        </Group>
-        <div className="panel-body">
-          <form method="post" action="/api/github/account" data-settings-form>
-            <ReturnToInput returnTo={returnTo} />
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-              <TextInput name="githubUsername" label="GitHub Owner" description="User or organization, for example octocat or my-org." defaultValue={settings.githubUsername} placeholder="owner-or-org" required />
-              <TextInput label="SSH Private Key" value={settings.githubSshPrivateKeyPath || "not generated"} readOnly />
-            </SimpleGrid>
-            <Textarea
-              label="SSH Public Key"
-              description="Add this key to the GitHub user/org that owns the repositories."
-              value={settings.githubSshPublicKey || "Generate a key first."}
-              autosize
-              minRows={3}
-              readOnly
-            />
-            <Alert color="blue" icon={<Info size={16} />}>
-              The private key is stored as a local file at the path above. SQLite stores only the GitHub owner, private key path, and public key text.
-            </Alert>
-            <Group className="form-actions">
-              <Button type="submit" leftSection={<KeyRound size={16} />}>
-                Save Account / Ensure SSH Key
-              </Button>
-              <Button component="a" href="https://github.com/settings/keys" target="_blank" variant="light" leftSection={<GitBranch size={16} />}>
-                Open GitHub SSH Keys
-              </Button>
-            </Group>
-            {settings.githubUsername && (
-              <Text size="sm" c="dimmed" mt="sm">
-                Add Project will list repositories owned by <Code>{settings.githubUsername}</Code> using your local <Code>gh</Code> login.
-              </Text>
-            )}
-          </form>
         </div>
-      </Paper>
-      <Paper>
-        <Group justify="space-between" p="md" className="section-header">
+      </section>
+
+      <section className="settings-section">
+        <div className="settings-section-heading">
           <div>
-            <Text fw={760}>Runtime Settings</Text>
-            <Text size="sm" c="dimmed">
-              Saved to data/gitdex.sqlite
-            </Text>
+            <Group gap="xs" align="center">
+              <Text className="settings-section-title">GitHub Owner</Text>
+              <Badge color={hasGitHubKey ? "green" : "yellow"} variant="light" size="sm">
+                {hasGitHubKey ? "key ready" : "setup required"}
+              </Badge>
+            </Group>
+            <Text className="settings-row-description">Configure a GitHub user or organization owner before adding projects.</Text>
           </div>
-        </Group>
-        <div className="panel-body">
-          <form method="post" action="/api/settings" data-settings-form>
-            <ReturnToInput returnTo={returnTo} />
+        </div>
+        <form method="post" action="/api/github/account" data-settings-form className="settings-form">
+          <ReturnToInput returnTo={returnTo} />
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+            <TextInput name="githubUsername" label="GitHub Owner" description="User or organization, for example octocat or my-org." defaultValue={settings.githubUsername} placeholder="owner-or-org" required />
+            <TextInput label="SSH Private Key" value={settings.githubSshPrivateKeyPath || "not generated"} readOnly />
+          </SimpleGrid>
+          <Textarea
+            label="SSH Public Key"
+            description="Add this key to the GitHub user/org that owns the repositories."
+            value={settings.githubSshPublicKey || "Generate a key first."}
+            autosize
+            minRows={3}
+            readOnly
+          />
+          <Alert color="blue" icon={<Info size={16} />}>
+            The private key is stored locally. SQLite stores only the GitHub owner, private key path, and public key text.
+          </Alert>
+          <Group className="form-actions">
+            <Button type="submit" leftSection={<KeyRound size={16} />}>
+              Save Account
+            </Button>
+            <Button component="a" href="https://github.com/settings/keys" target="_blank" variant="light" leftSection={<GitBranch size={16} />}>
+              SSH Keys
+            </Button>
+          </Group>
+          {settings.githubUsername && (
+            <Text size="sm" c="dimmed" mt="sm">
+              Add Project will list repositories owned by <Code>{settings.githubUsername}</Code> using your local <Code>gh</Code> login.
+            </Text>
+          )}
+        </form>
+      </section>
+
+      <form method="post" action="/api/settings" data-settings-form className="settings-form">
+        <ReturnToInput returnTo={returnTo} />
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <div>
+              <Text className="settings-section-title">Runtime</Text>
+              <Text className="settings-row-description">Saved to data/gitdex.sqlite.</Text>
+            </div>
+          </div>
+          <div className="settings-subsection">
             <Text className="section-title">App</Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <TextInput name="appBaseUrl" label="App Base URL" defaultValue={settings.appBaseUrl} placeholder="https://your-bot.example.com" />
               <TextInput name="telegramWebhookSecret" label="Telegram Webhook Secret" defaultValue={settings.telegramWebhookSecret} placeholder="secret-token" />
             </SimpleGrid>
             <PasswordInput name="telegramBotToken" label="Telegram Bot Token" defaultValue={settings.telegramBotToken} placeholder="123456:ABC..." />
-
+          </div>
+          <div className="settings-subsection">
             <Text className="section-title">Codex CLI</Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <TextInput name="codexBin" label="Codex Binary" defaultValue={settings.codexBin} />
@@ -123,41 +125,42 @@ export async function SettingsPanel({
               <TextInput name="codexSandbox" label="Sandbox" defaultValue={settings.codexSandbox} />
               <TextInput name="codexApprovalPolicy" label="Approval Policy" defaultValue={settings.codexApprovalPolicy} />
             </SimpleGrid>
-
+          </div>
+          <div className="settings-subsection">
             <Text className="section-title">Fallback GitHub API</Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <TextInput name="githubRepo" label="GitHub Repo" defaultValue={settings.githubRepo} placeholder="owner/repo" />
               <TextInput name="githubApiUrl" label="GitHub API URL" defaultValue={settings.githubApiUrl} />
             </SimpleGrid>
             <PasswordInput name="githubToken" label="GitHub Token" defaultValue={settings.githubToken} placeholder="ghp_..." />
-
+          </div>
+          <div className="settings-subsection">
             <Text className="section-title">Worktrees</Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
               <NumberInput name="worktreeRetentionDays" label="Worktree Retention Days" min={1} max={365} defaultValue={settings.worktreeRetentionDays} />
-              <div>
-                <Checkbox name="autoCleanupCompletedWorktrees" label="Auto cleanup completed worktrees" defaultChecked={settings.autoCleanupCompletedWorktrees} mb="sm" />
+              <div className="settings-checkbox-stack">
+                <Checkbox name="autoCleanupCompletedWorktrees" label="Auto cleanup completed worktrees" defaultChecked={settings.autoCleanupCompletedWorktrees} />
                 <Checkbox name="rebuildWorktreeOnEnvironmentBlocked" label="Rebuild worktree on environment blocked" defaultChecked={settings.rebuildWorktreeOnEnvironmentBlocked} />
               </div>
             </SimpleGrid>
             <Text size="sm" c="dimmed">
-              Completed issue, QA, review, and archived recovery worktrees are local execution buffers. Gitdex keeps recent worktrees for diagnosis and removes older completed buffers after the retention window.
+              Completed worktrees are local execution buffers. Gitdex keeps recent buffers for diagnosis and removes older completed buffers after the retention window.
             </Text>
-
-            <Group className="form-actions">
-              <Button type="submit" leftSection={<Save size={16} />}>
-                Save Settings
-              </Button>
-              <Button type="submit" variant="light" leftSection={<Webhook size={16} />} formAction="/api/setup/webhook">
-                Setup Telegram Webhook
-              </Button>
-              <Button type="submit" variant="light" color="red" leftSection={<Trash2 size={16} />} formAction="/api/worktrees/cleanup">
-                Clean Inactive Worktrees
-              </Button>
-            </Group>
-          </form>
-        </div>
-      </Paper>
-    </>
+          </div>
+          <Group className="form-actions">
+            <Button type="submit" leftSection={<Save size={16} />}>
+              Save Settings
+            </Button>
+            <Button type="submit" variant="light" leftSection={<Webhook size={16} />} formAction="/api/setup/webhook">
+              Setup Webhook
+            </Button>
+            <Button type="submit" variant="light" color="red" leftSection={<Trash2 size={16} />} formAction="/api/worktrees/cleanup">
+              Clean Worktrees
+            </Button>
+          </Group>
+        </section>
+      </form>
+    </div>
   );
 }
 
