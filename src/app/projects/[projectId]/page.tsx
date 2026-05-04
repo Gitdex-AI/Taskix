@@ -398,7 +398,6 @@ function ProjectWorkspaceSidebar(input: {
             </div>
           </Group>
           <Group gap={4} wrap="nowrap">
-            <ProjectSyncForm projectId={project.projectId} compact />
             <Link
               href={projectsPanelAction.href}
               className={`sidebar-icon-link${projectsPanelAction.active ? " active" : ""}`}
