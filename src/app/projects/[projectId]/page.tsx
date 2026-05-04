@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Alert, Badge, Button, Code, Group, Paper, Stack, Text, Title } from "@mantine/core";
+import { Alert, Badge, Button, Code, Group, Stack, Text } from "@mantine/core";
 import { Archive, ArrowLeft, GitBranch, Info, Plus, RefreshCw, RotateCcw, Settings, Trash2, UserCircle } from "lucide-react";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import { ProjectAutoRunJob } from "@/components/ProjectAutoRunJob";
@@ -220,38 +220,36 @@ function normalizeSelectedPhase(value: string | undefined, hasUnqueuedPmHandoff:
 function RequirementsPanelContent({ project, workflows, jobs, message, error }: { project: ProjectRecord; workflows: WorkflowRecord[]; jobs: JobRecord[]; message?: string; error?: string }) {
   const archivedCount = workflows.filter((workflow) => workflow.archivedAt).length;
   return (
-    <Stack gap="lg">
+    <div className="requirements-panel">
       {error ? <Alert color="red" icon={<Info size={16} />}>{error}</Alert> : null}
       {message ? <Alert color="green" icon={<Info size={16} />}>{message}</Alert> : null}
-      <Group justify="space-between" align="flex-start">
-        <div>
-          <Group gap="sm">
-            <Title order={1}>Requirements</Title>
-            <Badge variant="light">{workflows.length} total</Badge>
-            {archivedCount ? <Badge variant="outline" color="gray">{archivedCount} archived</Badge> : null}
-          </Group>
-          <Text c="dimmed" size="sm">
-            Numbered requirements for {project.name}.
-          </Text>
-        </div>
-      </Group>
-
-      <Paper>
-        <Group justify="space-between" p="md" className="section-header">
-          <div>
-            <Text fw={760}>All Requirements</Text>
-            <Text size="sm" c="dimmed">Requirement number, status, and linked workflow detail.</Text>
-          </div>
+      <div className="settings-page-heading">
+        <Group gap="sm" align="center">
+          <div className="settings-page-title">Requirements</div>
+          <Badge variant="light">{workflows.length} total</Badge>
+          {archivedCount ? <Badge variant="outline" color="gray">{archivedCount} archived</Badge> : null}
         </Group>
-        <Stack p="md" gap="xs">
+        <Text c="dimmed" size="sm">
+          Numbered requirements for {project.name}.
+        </Text>
+      </div>
+
+      <section className="settings-section">
+        <div className="settings-section-heading">
+          <div>
+            <div className="settings-section-title">Requirement History</div>
+            <Text size="sm" c="dimmed">Status, issue count, and linked workflow detail.</Text>
+          </div>
+        </div>
+        <div className="requirements-panel-list">
           {workflows.length ? workflows.map((workflow) => (
             <RequirementPanelRow key={workflow.workflowId} projectId={project.projectId} workflow={workflow} jobs={jobs} />
           )) : (
-            <Text size="sm" c="dimmed">No numbered requirements yet.</Text>
+            <Text size="sm" c="dimmed" className="requirements-panel-empty">No numbered requirements yet.</Text>
           )}
-        </Stack>
-      </Paper>
-    </Stack>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -259,24 +257,20 @@ function RequirementPanelRow({ projectId, workflow, jobs }: { projectId: string;
   const planningJob = latestWorkflowJob(workflow.workflowId, jobs, "workflow_run");
   const status = requirementStatus(workflow, planningJob);
   return (
-    <div className="requirement-row">
-      <div className="requirement-row-body">
-        <div className="requirement-row-main">
-          <Link href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`} className="requirement-row-link">
-            <Group gap="xs">
-              <Code>{workflow.trackingCode ?? workflow.workflowId}</Code>
-              <Badge size="xs" variant="light" color={status.color}>{status.label}</Badge>
-              {workflow.archivedAt ? <Badge size="xs" variant="outline" color="gray">Archived</Badge> : null}
-              <Badge size="xs" variant="outline">{workflow.issues.length} issue{workflow.issues.length === 1 ? "" : "s"}</Badge>
-            </Group>
-            <Text size="sm" mt={6} lineClamp={2}>{workflow.userRequirement}</Text>
-            <Text size="xs" c="dimmed" mt={4}>{workflow.archivedAt ? `Archived ${formatDate(workflow.archivedAt)}` : `Created ${formatDate(workflow.createdAt)}`}</Text>
-          </Link>
-        </div>
-        <Group gap={6} justify="flex-end" wrap="nowrap">
-          {!workflow.archivedAt ? renderRequirementRunAction(projectId, planningJob) : null}
-          {!workflow.archivedAt && workflow.trackingCode ? <ArchiveRequirementPanelForm projectId={projectId} workflowId={workflow.workflowId} /> : null}
+    <div className="requirements-panel-row">
+      <Link href={`/projects/${projectId}?workflow=${encodeURIComponent(workflow.workflowId)}&phase=github`} className="requirements-panel-row-link">
+        <Group gap="xs" wrap="wrap">
+          <Code>{workflow.trackingCode ?? workflow.workflowId}</Code>
+          <Badge size="xs" variant="light" color={status.color}>{status.label}</Badge>
+          {workflow.archivedAt ? <Badge size="xs" variant="outline" color="gray">Archived</Badge> : null}
+          <Badge size="xs" variant="outline">{workflow.issues.length} issue{workflow.issues.length === 1 ? "" : "s"}</Badge>
         </Group>
+        <Text size="sm" mt={8} lineClamp={3} className="requirements-panel-row-copy">{workflow.userRequirement}</Text>
+        <Text size="xs" c="dimmed" mt={5}>{workflow.archivedAt ? `Archived ${formatDate(workflow.archivedAt)}` : `Created ${formatDate(workflow.createdAt)}`}</Text>
+      </Link>
+      <div className="requirements-panel-row-actions">
+        {!workflow.archivedAt ? renderRequirementRunAction(projectId, planningJob) : null}
+        {!workflow.archivedAt && workflow.trackingCode ? <ArchiveRequirementPanelForm projectId={projectId} workflowId={workflow.workflowId} /> : null}
       </div>
     </div>
   );
