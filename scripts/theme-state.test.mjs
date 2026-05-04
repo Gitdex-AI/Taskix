@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   createThemePreferenceState,
@@ -6,10 +7,13 @@ import {
   persistThemeMode,
   readStoredThemeMode,
   resolveEffectiveTheme,
+  themePalettes,
   themeStorageKey,
   updateSystemThemePreference,
   updateThemeMode
 } from "../src/components/theme/theme-state.ts";
+
+const themeSelectorCss = readFileSync(new URL("../src/components/theme/theme-selector.module.css", import.meta.url), "utf8");
 
 function createStorageMock(initialValue = null) {
   const writes = [];
@@ -28,7 +32,87 @@ function createStorageMock(initialValue = null) {
   };
 }
 
+function parseHexColor(value) {
+  const match = /^#([0-9a-f]{6})$/i.exec(value);
+  assert.ok(match, `Expected ${value} to be a six-digit hex color.`);
+  const [, hex] = match;
+
+  return [0, 2, 4].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+}
+
+function relativeLuminance(hexColor) {
+  const [red, green, blue] = parseHexColor(hexColor).map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function contrastRatio(foreground, background) {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe("theme state helpers", () => {
+  it("keeps theme selector interaction colors on shared tokens", () => {
+    assert.match(themeSelectorCss, /\.option:focus-visible\s*\{[\s\S]*var\(--app-focus-ring\)/);
+    assert.match(themeSelectorCss, /\.option\[data-selected="true"\]\s*\{[\s\S]*var\(--app-text-inverted\)/);
+    assert.match(themeSelectorCss, /\.option\[data-selected="true"\]\s*\{[\s\S]*var\(--app-interactive-active\)/);
+    assert.match(themeSelectorCss, /:global\(html\[data-theme="dark"\] \.auth-form button\)\s*\{[\s\S]*var\(--app-filled-control-text\)/);
+    assert.doesNotMatch(themeSelectorCss, /#[0-9a-fA-F]{3,8}/);
+  });
+
+  it("keeps dark filled form controls readable against their shared filled background", () => {
+    assert.ok(
+      contrastRatio(themePalettes.dark["--app-filled-control-text"], "#1f2937") >= 4.5,
+      "Expected dark filled form control text to keep at least 4.5:1 contrast."
+    );
+  });
+
+  it("exposes matching shared UI tokens for bootstrap and client theme switching", () => {
+    const requiredTokens = [
+      "--app-bg",
+      "--app-bg-rgb",
+      "--app-bg-wash",
+      "--app-shell",
+      "--app-surface",
+      "--app-surface-muted",
+      "--app-surface-subtle",
+      "--app-border",
+      "--app-border-muted",
+      "--app-text",
+      "--app-text-strong",
+      "--app-text-muted",
+      "--app-text-inverted",
+      "--app-control-bg",
+      "--app-control-bg-muted",
+      "--app-control-bg-hover",
+      "--app-control-border",
+      "--app-filled-control-text",
+      "--app-focus-ring",
+      "--app-interactive",
+      "--app-interactive-hover",
+      "--app-interactive-active",
+      "--app-shadow-md",
+      "--app-shadow-interactive"
+    ];
+
+    assert.deepEqual(Object.keys(themePalettes.light).sort(), Object.keys(themePalettes.dark).sort());
+
+    for (const theme of ["light", "dark"]) {
+      for (const token of requiredTokens) {
+        assert.match(themePalettes[theme][token], /\S/, `Expected ${token} in ${theme} theme palette.`);
+      }
+    }
+  });
+
   it("accepts only supported stored theme modes", () => {
     assert.equal(normalizeThemeMode("system"), "system");
     assert.equal(normalizeThemeMode("light"), "light");
