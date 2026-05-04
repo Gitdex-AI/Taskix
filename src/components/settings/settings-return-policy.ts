@@ -8,3 +8,13 @@ export function shouldAllowSettingsReturnNavigation(input: {
   if (!input.isDirty) return true;
   return input.confirmLeave(input.prompt ?? settingsReturnDirtyPrompt);
 }
+
+export function shouldAllowBrowserSettingsReturnNavigation(input: {
+  isDirty: boolean;
+  prompt?: string;
+}): boolean {
+  return shouldAllowSettingsReturnNavigation({
+    ...input,
+    confirmLeave: (message) => window.confirm(message)
+  });
+}

@@ -7,7 +7,7 @@ import { Button } from "@mantine/core";
 import { ArrowLeft } from "lucide-react";
 import { useConsoleReturnNavigation } from "@/components/navigation/useConsoleReturnNavigation";
 import type { RecentProjectChat } from "@/lib/return-navigation";
-import { shouldAllowSettingsReturnNavigation } from "./settings-return-policy";
+import { shouldAllowBrowserSettingsReturnNavigation } from "./settings-return-policy";
 
 const settingsReturnSelector = "[data-settings-return-action]";
 
@@ -48,7 +48,7 @@ export function SettingsReturnNavigation({
     const handleReturnClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest(settingsReturnSelector) : null;
       if (!target) return;
-      if (shouldAllowSettingsReturnNavigation({ isDirty: dirty, confirmLeave: window.confirm })) return;
+      if (shouldAllowBrowserSettingsReturnNavigation({ isDirty: dirty })) return;
       event.preventDefault();
       event.stopPropagation();
     };
