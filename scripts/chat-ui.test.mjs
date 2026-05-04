@@ -42,6 +42,18 @@ assert.match(
   "Completed or merged issues should not fall through to the completed-developer-job Run Dev fallback"
 );
 
+assert.doesNotMatch(
+  projectPageSource,
+  /shouldFailedJobReturnToDeveloper/,
+  "Failed review or merge jobs should not override the current GitHub stage into Run Dev"
+);
+
+assert.match(
+  projectPageSource,
+  /if \(input\.canMerge\)[\s\S]*if \(input\.activeJob\?\.status === "failed"\)/,
+  "Merge-stage issues with a stale failed merge job should still expose the stage-correct Run Merge action"
+);
+
 assert.match(
   projectPageSource,
   /const visibleWorkflows = sortedWorkflows\.filter\(\(workflow\) => !workflow\.archivedAt\);[\s\S]*const latestWorkflow = queuedWorkflow \?\? visibleActiveWorkflows\[0\] \?\? visibleWorkflows\[0\] \?\? null;/,

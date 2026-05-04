@@ -949,8 +949,6 @@ function renderIssueStageAction(input: {
   if (input.activeJob?.status === "pending" && autoRunActive) return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
   if (input.activeJob?.status === "pending") return wrapAutoRunAction(runningLabelForJob(input.activeJob, input.issue), <ProjectRunJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />);
   if (input.activeJob?.status === "running") return <RunningActionButton label={runningLabelForJob(input.activeJob, input.issue)} />;
-  if (input.activeJob?.status === "failed" && shouldFailedJobReturnToDeveloper(input.activeJob)) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
-  if (input.activeJob?.status === "failed") return <ProjectRetryJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />;
   if (input.stage === "gd:architect" && input.specBlockedSessionKey) return wrapAutoRunAction(runningLabelForStage("Architect", input.issue), <ProjectEscalateSessionButton projectId={input.projectId} sessionKey={input.specBlockedSessionKey} />);
   if (input.stage === "gd:blocked" && input.issue.prUrl) return wrapAutoRunAction(runningLabelForStage("QA", input.issue), <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} label="Reset" />);
   if (input.stage === "gd:blocked") return null;
@@ -959,6 +957,7 @@ function renderIssueStageAction(input: {
   if (input.canArchitectReview) return wrapAutoRunAction(runningLabelForStage("Review", input.issue), <ProjectArchitectReviewButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (input.canHandoffToQa) return wrapAutoRunAction(runningLabelForStage("QA", input.issue), <ProjectHandoffToQaButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (input.canRunDev) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
+  if (input.activeJob?.status === "failed") return <ProjectRetryJobButton projectId={input.projectId} jobId={input.activeJob.jobId} label={runLabelForJob(input.activeJob)} />;
   if (isDeveloperBlockedIssue(input.issue)) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
   if (hasAnyLabel(input.issue, ["gitdex:blocked", "gitdex:spec-blocked"])) return null;
   if (!input.issue.prUrl && input.completedDeveloperJob && !hasPostDeveloperLifecycleLabel(input.issue)) return wrapAutoRunAction(runningLabelForStage("Dev", input.issue), <ProjectRunDeveloperIssueButton projectId={input.projectId} issueId={input.issue.issueId} />);
@@ -967,10 +966,6 @@ function renderIssueStageAction(input: {
 
 function wrapAutoRunAction(runningLabel: string, action: ReactNode): ReactNode {
   return <ProjectAutoRunIssueAction runningLabel={runningLabel}>{action}</ProjectAutoRunIssueAction>;
-}
-
-function shouldFailedJobReturnToDeveloper(job: JobRecord): boolean {
-  return job.type === "architect_review_run" || job.type === "merge_run";
 }
 
 function isDeveloperBlockedIssue(issue: IssueRecord): boolean {
