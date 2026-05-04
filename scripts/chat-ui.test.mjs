@@ -47,4 +47,16 @@ assert.match(
   "Archived requirements should be hidden from the default sidebar workflow selection"
 );
 
+assert.match(
+  chatAreaSource,
+  /if \(job\) return job\.status === "running" && !job\.runtime\?\.agentFinalAt;/,
+  "Stale running messages linked to failed or completed jobs should not keep showing live timers"
+);
+
+assert.match(
+  chatAreaSource,
+  /if \(job && job\.status !== "running"\) return stripAgentFinalBlocks\(message\.content\);/,
+  "Stale running messages linked to terminal jobs should render as static text without elapsed time"
+);
+
 console.log("chat UI source verification passed");

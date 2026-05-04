@@ -354,12 +354,14 @@ function isLiveMessage(message: TimelineMessage): boolean {
 function isMessageActivelyRunning(message: TimelineMessage, jobs: JobRecord[]): boolean {
   if (!isLiveMessage(message)) return false;
   const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
-  return !job?.runtime?.agentFinalAt;
+  if (job) return job.status === "running" && !job.runtime?.agentFinalAt;
+  return !isTerminalSession(message.session);
 }
 
 function messageDisplayContent(message: TimelineMessage, jobs: JobRecord[]): string {
   if (!isLiveMessage(message)) return stripAgentFinalBlocks(message.content);
   const job = message.jobId ? jobs.find((item) => item.jobId === message.jobId) : null;
+  if (job && job.status !== "running") return stripAgentFinalBlocks(message.content);
   if (job?.runtime?.agentFinalAt) {
     const status = job.runtime.agentFinalStatus ? ` (${job.runtime.agentFinalStatus})` : "";
     const summary = job.runtime.agentFinalSummary ? `: ${job.runtime.agentFinalSummary}` : "";
