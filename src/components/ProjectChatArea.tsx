@@ -1,7 +1,7 @@
 "use client";
 
-import { Alert, Badge, Button, Code, Group, Stack, Text, Textarea } from "@mantine/core";
-import { AlertTriangle, LoaderCircle, Send } from "lucide-react";
+import { ActionIcon, Alert, Badge, Button, Code, Group, Stack, Text, Textarea } from "@mantine/core";
+import { AlertTriangle, ArrowDown, LoaderCircle, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -49,7 +49,9 @@ export function ProjectChatArea({
   const [pending, setPending] = useState(false);
   const [optimisticMessage, setOptimisticMessage] = useState<TimelineMessage | null>(null);
   const [liveJobs, setLiveJobs] = useState(jobs);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const liveJobsRef = useRef(jobs);
+  const stickToBottomRef = useRef(true);
   const visibleSessions = readOnly && inspectedSession ? [inspectedSession] : sessions;
 
   useEffect(() => {
@@ -68,8 +70,8 @@ export function ProjectChatArea({
   useEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
-    scroll.scrollTop = scroll.scrollHeight;
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    if (!stickToBottomRef.current) return;
+    scrollToBottom("auto");
   }, [visibleSessions, optimisticMessage?.createdAt, pending, liveJobs]);
 
   useEffect(() => {
@@ -140,6 +142,8 @@ export function ProjectChatArea({
       session: null
     });
     form.reset();
+    stickToBottomRef.current = true;
+    setShowScrollToBottom(false);
 
     const response = await fetch(form.action, {
       method: "POST",
@@ -157,6 +161,24 @@ export function ProjectChatArea({
     event.currentTarget.form?.requestSubmit();
   }
 
+  function updateScrollPosition() {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const distanceFromBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight;
+    const scrolledUp = distanceFromBottom > 96;
+    stickToBottomRef.current = !scrolledUp;
+    setShowScrollToBottom(scrolledUp);
+  }
+
+  function scrollToBottom(behavior: ScrollBehavior = "smooth") {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    scroll.scrollTo({ top: scroll.scrollHeight, behavior });
+    bottomRef.current?.scrollIntoView({ block: "end", behavior });
+    stickToBottomRef.current = true;
+    setShowScrollToBottom(false);
+  }
+
   return (
     <>
       {readOnly ? (
@@ -167,12 +189,27 @@ export function ProjectChatArea({
           </Text>
         </div>
       ) : null}
-      <div ref={scrollRef} className="chat-scroll">
+      <div ref={scrollRef} className="chat-scroll" onScroll={updateScrollPosition}>
         <MessageList projectId={projectId} sessions={visibleSessions} jobs={liveJobs} workflows={workflows} inspectedSession={readOnly ? inspectedSession : null} optimisticMessage={optimisticMessage} pending={pending} />
         <div ref={bottomRef} aria-hidden="true" />
       </div>
       {!readOnly && (
         <div className="chat-composer">
+          {showScrollToBottom ? (
+            <ActionIcon
+              type="button"
+              className="chat-scroll-bottom-button"
+              radius="xl"
+              size={38}
+              variant="filled"
+              color="dark"
+              aria-label="Jump to latest message"
+              title="Jump to latest message"
+              onClick={() => scrollToBottom("smooth")}
+            >
+              <ArrowDown size={18} />
+            </ActionIcon>
+          ) : null}
           <form ref={formRef} method="post" action={`/api/projects/${projectId}/chat`} className="chat-composer-form" onSubmit={submitMessage}>
             {activeWorkflowId ? <input type="hidden" name="workflowId" value={activeWorkflowId} /> : null}
             <Textarea
