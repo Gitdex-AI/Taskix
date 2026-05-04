@@ -24,3 +24,19 @@ test("text Codex runs keep the stdout sentinel completion protocol", () => {
 
   assert.match(body, /withAgentFinalInstruction\(prompt\)/);
 });
+
+test("Codex child processes are detached and registered for shutdown cleanup", () => {
+  const body = functionBody("runCodex");
+
+  assert.match(body, /ensureCodexShutdownHandlers\(\);/);
+  assert.match(body, /detached: true/);
+  assert.match(body, /registerCodexChild\(child\);/);
+  assert.match(body, /terminateCodexChild\(child\.pid, child, "SIGTERM"\)/);
+});
+
+test("server shutdown kills the active Codex process group", () => {
+  assert.match(source, /process\.once\("SIGINT", \(\) => shutdownCodexChildrenAndExit\("SIGINT"\)\);/);
+  assert.match(source, /process\.once\("SIGTERM", \(\) => shutdownCodexChildrenAndExit\("SIGTERM"\)\);/);
+  assert.match(source, /terminateActiveCodexChildren\("SIGKILL"\);/);
+  assert.match(source, /process\.kill\(-pid, signal\);/);
+});

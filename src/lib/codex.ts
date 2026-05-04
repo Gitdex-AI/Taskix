@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execFile, spawn } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { developerRoleIds, developerRoleProfile, formatDeveloperRoleCatalog } from "@/lib/developer-roles";
 import { expectedDeveloperBaseBranch } from "@/lib/issue-run-policy";
@@ -33,7 +33,10 @@ type DeveloperWorktreeFacts = {
 };
 const execFileAsync = promisify(execFile);
 const codexTimeoutMs = 10 * 60 * 1000;
+const codexShutdownGraceMs = 1500;
 const ansiPattern = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+const activeCodexChildren = new Map<number, ChildProcess>();
+let codexShutdownHandlersInstalled = false;
 const agentFinalInstruction = `
 
 Agent completion protocol:
@@ -47,6 +50,46 @@ GITDEX_AGENT_FINAL_END
 
 function normalizeRuntimeOutput(chunk: Buffer | string): string {
   return String(chunk).replace(ansiPattern, "");
+}
+
+function ensureCodexShutdownHandlers(): void {
+  if (codexShutdownHandlersInstalled) return;
+  codexShutdownHandlersInstalled = true;
+  process.once("SIGINT", () => shutdownCodexChildrenAndExit("SIGINT"));
+  process.once("SIGTERM", () => shutdownCodexChildrenAndExit("SIGTERM"));
+}
+
+function shutdownCodexChildrenAndExit(signal: NodeJS.Signals): void {
+  terminateActiveCodexChildren(signal);
+  setTimeout(() => {
+    terminateActiveCodexChildren("SIGKILL");
+    process.exit(signal === "SIGINT" ? 130 : 143);
+  }, codexShutdownGraceMs).unref();
+}
+
+function registerCodexChild(child: ChildProcess): void {
+  if (!child.pid) return;
+  activeCodexChildren.set(child.pid, child);
+  child.once("close", () => activeCodexChildren.delete(child.pid as number));
+  child.once("error", () => activeCodexChildren.delete(child.pid as number));
+}
+
+function terminateActiveCodexChildren(signal: NodeJS.Signals): void {
+  for (const [pid, child] of activeCodexChildren) {
+    terminateCodexChild(pid, child, signal);
+  }
+}
+
+function terminateCodexChild(pid: number, child: ChildProcess, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      // The child may already have exited.
+    }
+  }
 }
 
 function formatDeveloperWorktreeFacts(facts: DeveloperWorktreeFacts): string {
@@ -985,12 +1028,15 @@ Summarize code review outcome, merge readiness, and deployment status according 
   private async runCodex(args: string[], options: RunCodexOptions = {}): Promise<{ ok: boolean; stdout: string; stderr: string }> {
     const codexHome = this.settings.codexHome;
     await mkdir(codexHome, { recursive: true });
+    ensureCodexShutdownHandlers();
     return new Promise((resolve) => {
       const child = spawn(this.settings.codexBin, ["exec", ...args], {
         cwd: options.cwd ?? rootDir,
         env: { ...process.env, CODEX_HOME: codexHome },
+        detached: true,
         stdio: ["ignore", "pipe", "pipe"]
       });
+      registerCodexChild(child);
       let stdout = "";
       let stderr = "";
       let finalBuffer = "";
@@ -1001,7 +1047,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
-        child.kill("SIGTERM");
+        if (child.pid) terminateCodexChild(child.pid, child, "SIGTERM");
         resolve({ ok: false, stdout, stderr: `${stderr}\nCodex timed out after ${Math.round(codexTimeoutMs / 1000)} seconds.` });
       }, codexTimeoutMs);
       child.stdout.on("data", (chunk) => {
