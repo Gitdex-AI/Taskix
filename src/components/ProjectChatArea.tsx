@@ -373,6 +373,12 @@ function canResolveMessageJob(message: TimelineMessage, jobs: JobRecord[]): mess
   return job?.status === "running" && isTerminalSession(message.session);
 }
 
+function messageWorkflowLabel(message: TimelineMessage, workflows: WorkflowRecord[]): string | null {
+  const workflowId = message.session?.workflowId;
+  if (!workflowId) return null;
+  return findWorkflow(workflowId, workflows)?.trackingCode ?? workflowId;
+}
+
 function isTerminalSession(session: AgentSessionRecord | null): boolean {
   return session?.status === "done" || session?.status === "blocked";
 }
@@ -462,8 +468,13 @@ function runningJobIssueLabel(job: JobRecord, session: AgentSessionRecord | null
   if (issueNumber) return `issue #${issueNumber}`;
   if (job.payload.issueId) return `issue ${job.payload.issueId}`;
   if (job.type === "memory_init") return "project memory";
-  if (job.type === "workflow_run") return `requirement ${job.payload.workflowId}`;
+  if (job.type === "workflow_run") return `requirement ${findWorkflow(job.payload.workflowId, workflows)?.trackingCode ?? job.payload.workflowId}`;
   return null;
+}
+
+function findWorkflow(workflowId: string | null | undefined, workflows: WorkflowRecord[]): WorkflowRecord | null {
+  if (!workflowId) return null;
+  return workflows.find((workflow) => workflow.workflowId === workflowId) ?? null;
 }
 
 function findWorkflowIssue(issueId: string | null, workflows: WorkflowRecord[]): IssueRecord | null {
@@ -528,7 +539,7 @@ function MessageList({
                 <Group gap="xs" mb={6} justify="space-between" align="center">
                   <Group gap={6}>
                     <Badge variant="light">{message.sourceLabel}</Badge>
-                    {message.session?.workflowId ? <Badge size="xs" variant="outline">{message.session.workflowId}</Badge> : null}
+                    {messageWorkflowLabel(message, workflows) ? <Badge size="xs" variant="outline">{messageWorkflowLabel(message, workflows)}</Badge> : null}
                     {message.session?.issueId ? <Badge size="xs" variant="outline">{message.session.issueId}</Badge> : null}
                     {messageExecutionDuration(message) ? <Badge size="xs" color="gray" variant="light">{messageExecutionDuration(message)}</Badge> : null}
                   </Group>
