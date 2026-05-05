@@ -519,8 +519,14 @@ footer span:first-child {
   }
 
   .hero {
-    min-height: 88vh;
-    background-size: cover, 900px, cover;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    min-height: auto;
+    padding-top: 104px;
+    padding-bottom: 42px;
+    background-position: center;
+    background-size: cover, 0 0, cover;
   }
 
   .hero::after {
@@ -528,10 +534,12 @@ footer span:first-child {
   }
 
   .hero-visual {
-    right: 14px;
-    bottom: 24px;
-    width: 94vw;
-    opacity: 0.32;
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: min(100%, 640px);
+    margin: 30px auto 0;
+    opacity: 0.95;
   }
 
   .flow-grid,
@@ -542,12 +550,43 @@ footer span:first-child {
 }
 
 @media (max-width: 680px) {
+  .hero {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  h1 {
+    font-size: clamp(64px, 20vw, 96px);
+  }
+
+  .hero-lede {
+    font-size: 19px;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions .button {
+    flex: 1 1 150px;
+  }
+
   .app-frame {
     grid-template-columns: 1fr;
+    min-height: 300px;
+    border-radius: 14px;
   }
 
   .app-sidebar {
     display: none;
+  }
+
+  .app-chat {
+    padding: 18px;
+  }
+
+  .message {
+    width: 100%;
   }
 
   .section,
