@@ -397,3 +397,7 @@ curl http://127.0.0.1:8000/api/setup/webhook
 MIT License。
 
 Copyright © 2026 Gitdex AI.
+
+## 免责声明
+
+Gitdex 使用 AI Agent 自动化 GitHub Issue/PR 驱动的部分开发流程。Agent 输出可能不完整或不准确，用户需要自行审核代码变更、流程操作、凭证权限和部署决策。Gitdex 基于 MIT License 按现状提供，不提供任何担保。

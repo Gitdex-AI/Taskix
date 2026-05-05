@@ -397,3 +397,7 @@ Commands:
 MIT License.
 
 Copyright © 2026 Gitdex AI.
+
+## Disclaimer
+
+Gitdex automates parts of a GitHub-based development workflow with AI agents. Agent output may be incomplete or incorrect, and users are responsible for reviewing code changes, workflow actions, credentials, permissions, and deployment decisions. Gitdex is provided as-is under the MIT License, without warranty.
