@@ -79,10 +79,10 @@
           <p class="eyebrow" data-lang="zh">面向编码 Agent 的开源控制台</p>
           <h1 id="hero-title">Gitdex</h1>
           <p class="hero-lede" data-lang="en">
-            Stop babysitting AI coding in chat. Gitdex gives your agent team a control room: PM, Planner, Dev, QA, Review, and Merge agents work in sequence or parallel while GitHub stores the trail.
+            AI coding works better with rails than with a loose chat thread. Gitdex gives PM, Planner, Dev, QA, Review, and Merge agents a small control room, while GitHub stores the trail.
           </p>
           <p class="hero-lede" data-lang="zh">
-            别再陪 AI 在聊天里绕圈。Gitdex 给你的 agent 团队一个控制台：PM、Planner、Dev、QA、Review、Merge 可以串行或并行协作，GitHub 负责保存痕迹。
+            AI 写代码更适合有轨道地协作，而不是只靠一串聊天。Gitdex 给 PM、Planner、Dev、QA、Review、Merge agent 一个小型控制台，GitHub 负责保存痕迹。
           </p>
           <div class="hero-actions">
             <a class="button primary" href="#install" data-lang="en">Install Gitdex</a>
@@ -97,29 +97,29 @@
         <div class="section-heading">
           <p class="eyebrow" data-lang="en">Why this exists</p>
           <p class="eyebrow" data-lang="zh">为什么需要它</p>
-          <h2 id="problems-title" data-lang="en">Chat is not a delivery system</h2>
-          <h2 id="problems-title-zh" data-lang="zh">聊天不是交付系统</h2>
-          <p data-lang="en">AI agents can write patches fast. The mess starts when they need to coordinate: who owns the next step, who validates, who reviews, who rebases, and what context survives.</p>
-          <p data-lang="zh">AI agent 写 patch 很快。混乱出现在协作阶段：谁负责下一步、谁验证、谁审核、谁 rebase、哪些上下文能留下来。</p>
+          <h2 id="problems-title" data-lang="en">Chat alone is a shaky delivery system</h2>
+          <h2 id="problems-title-zh" data-lang="zh">只靠聊天，交付会有点晃</h2>
+          <p data-lang="en">AI agents can write patches quickly. Coordination is the harder part: who owns the next step, who validates, who reviews, who rebases, and what context survives.</p>
+          <p data-lang="zh">AI agent 写 patch 很快。更难的是协作：谁负责下一步、谁验证、谁审核、谁 rebase、哪些上下文能留下来。</p>
         </div>
         <div class="feature-grid">
           <article>
-            <h3 data-lang="en">No more lost requirements</h3>
-            <h3 data-lang="zh">需求不再蒸发</h3>
-            <p data-lang="en">The PM agent shapes messy intent into executable work. GitHub stores the resulting spec so every later agent reads the same source.</p>
-            <p data-lang="zh">PM agent 把混乱想法整理成可执行任务。GitHub 保存产出的规格，让后续每个 agent 读取同一个来源。</p>
+            <h3 data-lang="en">Requirements get a place to land</h3>
+            <h3 data-lang="zh">需求有地方落下来</h3>
+            <p data-lang="en">The PM agent helps turn rough intent into executable work. GitHub stores the resulting spec so later agents have a shared reference.</p>
+            <p data-lang="zh">PM agent 帮助把粗略想法整理成可执行任务。GitHub 保存产出的规格，让后续 agent 有一个共同参考。</p>
           </article>
           <article>
-            <h3 data-lang="en">Agents leave evidence</h3>
-            <h3 data-lang="zh">Agent 必须留证据</h3>
-            <p data-lang="en">Dev, QA, Review, and Merge agents produce logs, comments, labels, and PRs. GitHub is the ledger; agents are the actors.</p>
-            <p data-lang="zh">Dev、QA、Review、Merge agent 产生日志、评论、标签和 PR。GitHub 是账本，agent 才是行动者。</p>
+            <h3 data-lang="en">Agents leave a trail</h3>
+            <h3 data-lang="zh">Agent 留下痕迹</h3>
+            <p data-lang="en">Dev, QA, Review, and Merge agents can produce logs, comments, labels, and PRs. GitHub acts as the ledger; agents do the work.</p>
+            <p data-lang="zh">Dev、QA、Review、Merge agent 可以产生日志、评论、标签和 PR。GitHub 像账本，agent 负责行动。</p>
           </article>
           <article>
             <h3 data-lang="en">State survives the session</h3>
             <h3 data-lang="zh">状态不依赖会话</h3>
-            <p data-lang="en">Agents can stop, retry, or hand off. The durable state lives in GitHub labels, comments, issues, and PRs, so the next agent can continue.</p>
-            <p data-lang="zh">agent 可以停止、重试、交接。持久状态保存在 GitHub 标签、评论、issue 和 PR 中，下一个 agent 可以接着干。</p>
+            <p data-lang="en">Agents may stop, retry, or hand off. Keeping state in GitHub labels, comments, issues, and PRs gives the next run a better chance to continue cleanly.</p>
+            <p data-lang="zh">agent 可能停止、重试或交接。把状态放在 GitHub 标签、评论、issue 和 PR 中，可以让下一次运行更容易接上。</p>
           </article>
         </div>
       </section>
@@ -128,10 +128,10 @@
         <div class="section-heading">
           <p class="eyebrow" data-lang="en">Agent-native execution loop</p>
           <p class="eyebrow" data-lang="zh">Agent 原生执行闭环</p>
-          <h2 id="workflow-title" data-lang="en">Make agents work like a team, not a pile of prompts</h2>
-          <h2 id="workflow-title-zh" data-lang="zh">让 Agent 像团队，而不是一堆 Prompt</h2>
-          <p data-lang="en">Gitdex gives every agent a role, every role a control point, and every control point a durable record. GitHub is the storage layer; the agent workflow is the product.</p>
-          <p data-lang="zh">Gitdex 给每个 agent 一个角色，给每个角色一个控制点，给每个控制点一条持久记录。GitHub 是存储层，agent 工作流才是产品主体。</p>
+          <h2 id="workflow-title" data-lang="en">Help agents behave more like a team</h2>
+          <h2 id="workflow-title-zh" data-lang="zh">让 Agent 更像一个团队</h2>
+          <p data-lang="en">Gitdex gives each agent role a control point and keeps a durable record for the handoff. GitHub is the storage layer; the agent workflow is the core idea.</p>
+          <p data-lang="zh">Gitdex 给每个 agent 角色一个控制点，并为交接留下持久记录。GitHub 是存储层，agent 工作流是核心想法。</p>
         </div>
         <div class="flow-grid">
           <article>
@@ -169,21 +169,21 @@
         <div class="section-heading">
           <p class="eyebrow" data-lang="en">What you get</p>
           <p class="eyebrow" data-lang="zh">你得到什么</p>
-          <h2 id="features-title" data-lang="en">An agent system you can actually debug</h2>
-          <h2 id="features-title-zh" data-lang="zh">一个真的能调试的 Agent 系统</h2>
+          <h2 id="features-title" data-lang="en">An agent system that tries to stay debuggable</h2>
+          <h2 id="features-title-zh" data-lang="zh">一个尽量保持可调试的 Agent 系统</h2>
         </div>
         <div class="feature-grid">
           <article>
             <h3 data-lang="en">Agents first, GitHub persisted</h3>
             <h3 data-lang="zh">Agent 优先，GitHub 持久化</h3>
-            <p data-lang="en">The workflow is agent-driven, but the memory is durable: specs, QA failures, reviews, and merge results are stored where engineers already look.</p>
-            <p data-lang="zh">流程由 agent 驱动，但记忆是持久的：规格、QA 失败、审核和合并结果都保存在工程师本来就会看的地方。</p>
+            <p data-lang="en">The workflow is agent-driven, while specs, QA failures, reviews, and merge results are stored where engineers already look.</p>
+            <p data-lang="zh">流程由 agent 驱动，同时把规格、QA 失败、审核和合并结果保存在工程师本来就会看的地方。</p>
           </article>
           <article>
             <h3 data-lang="en">Agents with jobs</h3>
             <h3 data-lang="zh">Agent 有明确岗位</h3>
-            <p data-lang="en">Planner plans, Dev builds, QA breaks things, Review challenges the diff, Merge closes the loop.</p>
-            <p data-lang="zh">Planner 负责拆解，Dev 负责实现，QA 负责找问题，Review 负责挑战 diff，Merge 负责闭环。</p>
+            <p data-lang="en">Planner plans, Dev builds, QA checks, Review challenges the diff, Merge closes the loop when the issue is ready.</p>
+            <p data-lang="zh">Planner 负责拆解，Dev 负责实现，QA 负责检查，Review 负责挑战 diff，Merge 在 issue 就绪后闭环。</p>
           </article>
           <article>
             <h3 data-lang="en">Watch the machine run</h3>
@@ -194,20 +194,20 @@
           <article>
             <h3 data-lang="en">Auto-run without magic</h3>
             <h3 data-lang="zh">自动推进，但不装神秘</h3>
-            <p data-lang="en">Gitdex runs anything runnable, pauses when blocked, and keeps the controls visible instead of hiding automation behind a spinner.</p>
-            <p data-lang="zh">Gitdex 会推进所有可运行任务，遇到阻塞就停下，并把控制点暴露出来，而不是把自动化藏在转圈里。</p>
+            <p data-lang="en">Gitdex can keep runnable work moving, pause on blockers, and expose controls instead of hiding automation behind a spinner.</p>
+            <p data-lang="zh">Gitdex 可以推进可运行任务，遇到阻塞时暂停，并把控制点暴露出来，而不是只把自动化藏在转圈里。</p>
           </article>
           <article>
             <h3 data-lang="en">Runs where your repo lives</h3>
             <h3 data-lang="zh">运行在你的仓库旁边</h3>
-            <p data-lang="en">Local data, local worktrees, your GitHub CLI, your Codex login. No black-box cloud queue required.</p>
-            <p data-lang="zh">本地数据、本地 worktree、你的 GitHub CLI、你的 Codex 登录。不需要黑盒云队列。</p>
+            <p data-lang="en">Local data, local worktrees, your GitHub CLI, your Codex login. It is designed to run close to the repo, not behind an opaque queue.</p>
+            <p data-lang="zh">本地数据、本地 worktree、你的 GitHub CLI、你的 Codex 登录。它设计为运行在仓库旁边，而不是藏在不透明队列后面。</p>
           </article>
           <article>
             <h3 data-lang="en">Hackable by default</h3>
             <h3 data-lang="zh">默认可折腾</h3>
-            <p data-lang="en">Install the CLI, run dev mode, wire it as a service, fork the workflow, change the prompts, ship your own control room.</p>
-            <p data-lang="zh">装 CLI、跑 dev mode、注册服务、fork 工作流、改 prompt，做你自己的控制台。</p>
+            <p data-lang="en">Install the CLI, run dev mode, wire it as a service, fork the workflow, change the prompts, and make the control room fit your repo.</p>
+            <p data-lang="zh">装 CLI、跑 dev mode、注册服务、fork 工作流、改 prompt，让这个控制台适配你的仓库。</p>
           </article>
         </div>
       </section>
