@@ -394,4 +394,6 @@ curl http://127.0.0.1:8000/api/setup/webhook
 
 ## License
 
-尚未声明 License。
+MIT License。
+
+Copyright © 2026 Gitdex AI.

@@ -394,4 +394,6 @@ Commands:
 
 ## License
 
-License is not declared yet.
+MIT License.
+
+Copyright © 2026 Gitdex AI.
