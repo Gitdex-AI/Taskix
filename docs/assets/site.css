@@ -160,10 +160,9 @@ a {
   color: #ffffff;
   background:
     linear-gradient(rgba(13, 16, 11, 0.2), rgba(13, 16, 11, 0.68)),
-    url("./hero-console.svg"),
     linear-gradient(135deg, #070906 0%, #12180f 52%, #22200f 100%);
-  background-position: center, center right, center;
-  background-size: cover, min(980px, 86vw), cover;
+  background-position: center;
+  background-size: cover;
   background-repeat: no-repeat;
 }
 
