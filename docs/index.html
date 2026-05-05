@@ -227,7 +227,18 @@
         </div>
         <div class="install-card">
           <div class="terminal-title">Terminal</div>
-          <pre><code>curl -fsSL https://gitdex.ai/install.sh | bash</code></pre>
+          <div class="install-command">
+            <input
+              type="text"
+              value="curl -fsSL https://gitdex.ai/install.sh | bash"
+              aria-label="Gitdex install command"
+              readonly
+            />
+            <button type="button" data-copy-install>
+              <span data-lang="en">Copy</span>
+              <span data-lang="zh">复制</span>
+            </button>
+          </div>
           <div class="install-actions">
             <a class="button primary" href="https://github.com/Gitdex-AI/gitdex/tree/v0.2.0" data-lang="en">Release source</a>
             <a class="button primary" href="https://github.com/Gitdex-AI/gitdex/tree/v0.2.0" data-lang="zh">版本源码</a>
@@ -256,6 +267,25 @@
           const language = button.getAttribute("data-language-button") || "en";
           localStorage.setItem("gitdex-language", language);
           setLanguage(language);
+        });
+      }
+
+      const copyInstallButton = document.querySelector("[data-copy-install]");
+      const installCommandInput = document.querySelector(".install-command input");
+      if (copyInstallButton && installCommandInput) {
+        copyInstallButton.addEventListener("click", async () => {
+          const command = installCommandInput.value;
+          try {
+            await navigator.clipboard.writeText(command);
+          } catch {
+            installCommandInput.select();
+            document.execCommand("copy");
+            installCommandInput.blur();
+          }
+          copyInstallButton.dataset.copied = "true";
+          setTimeout(() => {
+            delete copyInstallButton.dataset.copied;
+          }, 1600);
         });
       }
 

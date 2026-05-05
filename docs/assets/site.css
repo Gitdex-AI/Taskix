@@ -481,14 +481,59 @@ h3 {
   font-weight: 800;
 }
 
-pre {
-  margin: 0 0 18px;
-  overflow-x: auto;
+.install-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.install-command input {
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
   color: #e0f2fe;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-wrap;
+  outline: none;
+}
+
+.install-command input:focus {
+  border-color: rgba(139, 213, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.22);
+}
+
+.install-command button {
+  min-width: 88px;
+  height: 46px;
+  padding: 0 16px;
+  color: #07101f;
+  background: #d1fae5;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.install-command button:hover {
+  background: #a7f3d0;
+}
+
+.install-command button[data-copied="true"] span {
+  display: none !important;
+}
+
+.install-command button[data-copied="true"]::after {
+  content: "Copied";
+}
+
+:root[data-language="zh"] .install-command button[data-copied="true"]::after {
+  content: "已复制";
 }
 
 .install .button.secondary {
@@ -569,6 +614,14 @@ footer span:first-child {
 
   .hero-actions .button {
     flex: 1 1 150px;
+  }
+
+  .install-command {
+    grid-template-columns: 1fr;
+  }
+
+  .install-command button {
+    width: 100%;
   }
 
   .app-frame {
