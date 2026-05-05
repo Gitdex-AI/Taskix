@@ -8,6 +8,7 @@ import { ProjectAutoRunIssueAction } from "@/components/ProjectAutoRunIssueActio
 import { ProjectAutoRunIssuesButton } from "@/components/ProjectAutoRunIssuesButton";
 import { ProjectAutoSync } from "@/components/ProjectAutoSync";
 import { ProjectChatArea } from "@/components/ProjectChatArea";
+import { ProjectChatLayout } from "@/components/ProjectChatLayout";
 import { ProjectDetailPanel } from "@/components/ProjectDetailPanel";
 import { ProjectArchitectReviewButton } from "@/components/ProjectArchitectReviewButton";
 import { ProjectEscalateSessionButton } from "@/components/ProjectEscalateSessionButton";
@@ -113,7 +114,7 @@ export default async function ProjectDetailPage({
         </Alert>
       )}
       <ProjectAutoSync projectId={project.projectId} />
-      <div className="project-chat-layout">
+      <ProjectChatLayout>
         <ProjectWorkspaceSidebar
           project={project}
           isInspectingIssueSession={isInspectingIssueSession}
@@ -143,7 +144,7 @@ export default async function ProjectDetailPage({
             <ProjectChatArea projectId={project.projectId} sessions={chatSessions} jobs={workflowPanelJobs.length ? workflowPanelJobs : jobs} workflows={workflowPanelWorkflows.length ? workflowPanelWorkflows : workflows} activeWorkflowId={latestWorkflow?.workflowId ?? null} inspectedSession={activeSession} readOnly={isInspectingIssueSession} />
           )}
         </main>
-      </div>
+      </ProjectChatLayout>
     </>
   );
 }

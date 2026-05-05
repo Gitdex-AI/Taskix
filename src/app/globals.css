@@ -524,6 +524,7 @@ pre,
 }
 
 .project-chat-layout {
+  position: relative;
   display: grid;
   grid-template-columns: clamp(360px, 30vw, 460px) minmax(0, 1fr);
   gap: 0;
@@ -535,6 +536,42 @@ pre,
   background: var(--app-surface-muted);
   border: 1px solid var(--app-border-muted);
   border-radius: 0;
+}
+
+.project-chat-layout.sidebar-collapsed {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.project-chat-layout.sidebar-collapsed .project-workspace-sidebar {
+  min-width: 0;
+  overflow: hidden;
+  border-right: 0;
+  pointer-events: none;
+}
+
+.project-sidebar-collapse-button {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--app-text-muted);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-muted);
+  border-radius: 9px;
+  box-shadow: 0 8px 22px var(--app-shadow-sm);
+  cursor: pointer;
+}
+
+.project-sidebar-collapse-button:hover,
+.project-sidebar-collapse-button:focus-visible {
+  color: var(--app-text);
+  background: var(--app-surface-subtle);
+  border-color: var(--app-border);
 }
 
 .project-workspace-sidebar {
@@ -560,6 +597,7 @@ pre,
 }
 
 .project-sidebar-header {
+  padding-left: 38px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--app-border-subtle);
 }
@@ -1868,6 +1906,10 @@ pre,
     grid-template-columns: clamp(320px, 34vw, 400px) minmax(0, 1fr);
   }
 
+  .project-chat-layout.sidebar-collapsed {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+
   .workflow-detail-layout {
     grid-template-columns: 1fr;
   }
@@ -1886,6 +1928,14 @@ pre,
     overflow: visible;
   }
 
+  .project-chat-layout.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .project-sidebar-collapse-button {
+    display: none;
+  }
+
   .project-workspace-sidebar {
     position: static;
     height: auto;
@@ -1894,6 +1944,12 @@ pre,
     border-right: 0;
     border-bottom: 1px solid var(--app-border-muted);
     border-radius: 0;
+  }
+
+  .project-chat-layout.sidebar-collapsed .project-workspace-sidebar {
+    overflow: visible;
+    border-bottom: 1px solid var(--app-border-muted);
+    pointer-events: auto;
   }
 
   .project-sidebar-scroll {
