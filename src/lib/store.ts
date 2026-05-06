@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sanitizeAgentSession } from "@/lib/agent-session-sanitize";
 import { getDb } from "@/lib/db";
 import { publishJobEvent } from "@/lib/job-events";
 import { deleteProjectLocalState } from "@/lib/project-delete";
@@ -378,11 +379,12 @@ export async function getAgentSession(sessionKey: string): Promise<AgentSessionR
 }
 
 export async function saveAgentSession(session: AgentSessionRecord): Promise<void> {
+  const sanitizedSession = sanitizeAgentSession(session);
   getDb()
     .prepare(
       "INSERT INTO agent_sessions (session_key, project_id, role, updated_at, payload) VALUES (?, ?, ?, ?, ?) ON CONFLICT(session_key) DO UPDATE SET project_id = excluded.project_id, role = excluded.role, updated_at = excluded.updated_at, payload = excluded.payload"
     )
-    .run(session.sessionKey, session.projectId, session.role, session.updatedAt, JSON.stringify(session));
+    .run(sanitizedSession.sessionKey, sanitizedSession.projectId, sanitizedSession.role, sanitizedSession.updatedAt, JSON.stringify(sanitizedSession));
 }
 
 export async function deleteAgentSession(sessionKey: string): Promise<void> {

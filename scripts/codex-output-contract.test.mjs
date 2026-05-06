@@ -16,7 +16,8 @@ test("JSON-schema Codex runs do not request stdout sentinel output", () => {
 
   assert.match(body, /"--output-schema"[\s\S]*schemaPath/);
   assert.doesNotMatch(body, /withAgentFinalInstruction\(prompt\)/);
-  assert.match(body, /outputPath,\s*\n\s*prompt\s*\n\s*\]/);
+  assert.match(body, /outputPath,\s*\n\s*"-"\s*\n\s*\]/);
+  assert.match(body, /stdin: prompt/);
 });
 
 test("text Codex runs keep the stdout sentinel completion protocol", () => {

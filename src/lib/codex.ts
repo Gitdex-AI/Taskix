@@ -16,7 +16,7 @@ type CodexTextResult = { text: string; sessionId?: string | null; executionLog?:
 type PlannerIssuePlanResult = { issues: IssueSpec[]; executionLog: string };
 type RunJsonOptions = { cwd?: string };
 type RunTextOptions = { cwd?: string };
-type RunCodexOptions = { cwd?: string };
+type RunCodexOptions = { cwd?: string; stdin?: string };
 type DeveloperWorktreeFacts = {
   expectedBranch: string;
   activePrBranch: string | null;
@@ -102,11 +102,17 @@ function formatDeveloperWorktreeFacts(facts: DeveloperWorktreeFacts): string {
     `- currentHead: ${facts.currentHead ?? "unknown"}`,
     `- baseBranch: ${facts.baseBranch}`,
     `- baseHead: ${facts.baseHead ?? "unknown"}`,
-    `- fetchSummary:\n${indentFact(facts.fetchSummary || "ok")}`,
-    `- git status --short --branch:\n${indentFact(facts.statusShort || "clean or unavailable")}`,
-    `- git diff --name-status:\n${indentFact(facts.diffNameStatus || "none")}`,
-    `- git diff --name-status origin/activePrBranch:\n${indentFact(facts.diffAgainstActiveBranch || "none or no active PR branch")}`
+    `- fetchSummary:\n${indentFact(limitFact(facts.fetchSummary || "ok"))}`,
+    `- git status --short --branch:\n${indentFact(limitFact(facts.statusShort || "clean or unavailable"))}`,
+    `- git diff --name-status:\n${indentFact(limitFact(facts.diffNameStatus || "none"))}`,
+    `- git diff --name-status origin/activePrBranch:\n${indentFact(limitFact(facts.diffAgainstActiveBranch || "none or no active PR branch"))}`
   ].join("\n");
+}
+
+function limitFact(value: string, maxChars = 6000): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars)}\n... truncated ${trimmed.length - maxChars} chars; inspect the worktree directly for the full output ...`;
 }
 
 function indentFact(value: string): string {
@@ -999,10 +1005,10 @@ Summarize code review outcome, merge readiness, and deployment status according 
       schemaPath,
       "-o",
       outputPath,
-      prompt
-    ], { cwd: options.cwd });
+      "-"
+    ], { cwd: options.cwd, stdin: prompt });
     const executionLog = formatCodexExecutionLog(result.stdout, result.stderr);
-    if (!result.ok) return { value: null, error: result.stderr.trim() || "Codex exited with a non-zero status.", executionLog };
+    if (!result.ok) return { value: null, error: summarizeCodexFailure(result.stderr, result.stdout), executionLog };
     try {
       return { value: JSON.parse(await readFile(outputPath, "utf8")) as T, error: null, executionLog };
     } catch {
@@ -1014,9 +1020,9 @@ Summarize code review outcome, merge readiness, and deployment status according 
     const tmp = await this.tmpDir();
     const outputPath = path.join(tmp, "output.txt");
     const args = sessionId
-      ? ["resume", "--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, sessionId, withAgentFinalInstruction(prompt)]
-      : ["--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, withAgentFinalInstruction(prompt)];
-    const result = await this.runCodex(args, { cwd: options.cwd });
+      ? ["resume", "--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, sessionId, "-"]
+      : ["--skip-git-repo-check", ...codexPermissionArgs(this.settings.codexSandbox, this.settings.codexApprovalPolicy), "--model", this.settings.codexModel, "-o", outputPath, "-"];
+    const result = await this.runCodex(args, { cwd: options.cwd, stdin: withAgentFinalInstruction(prompt) });
     if (!result.ok) return null;
     try {
       return { text: stripAgentFinalBlock(await readFile(outputPath, "utf8")).trim(), sessionId: extractSessionId(result.stderr) ?? sessionId, executionLog: formatCodexExecutionLog(result.stdout, result.stderr) };
@@ -1034,7 +1040,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
         cwd: options.cwd ?? rootDir,
         env: { ...process.env, CODEX_HOME: codexHome },
         detached: true,
-        stdio: ["ignore", "pipe", "pipe"]
+        stdio: [options.stdin ? "pipe" : "ignore", "pipe", "pipe"]
       });
       registerCodexChild(child);
       let stdout = "";
@@ -1044,13 +1050,16 @@ Summarize code review outcome, merge readiness, and deployment status according 
       let settled = false;
       const activeJobId = getActiveJobId();
       if (activeJobId) void touchJobRuntime(activeJobId, { pid: child.pid ?? null });
+      if (options.stdin && child.stdin) {
+        child.stdin.end(options.stdin);
+      }
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
         if (child.pid) terminateCodexChild(child.pid, child, "SIGTERM");
         resolve({ ok: false, stdout, stderr: `${stderr}\nCodex timed out after ${Math.round(codexTimeoutMs / 1000)} seconds.` });
       }, codexTimeoutMs);
-      child.stdout.on("data", (chunk) => {
+      child.stdout?.on("data", (chunk) => {
         const text = normalizeRuntimeOutput(chunk);
         stdout += text;
         if (activeJobId) void touchJobRuntime(activeJobId, { output: true, outputChunk: text });
@@ -1063,7 +1072,7 @@ Summarize code review outcome, merge readiness, and deployment status according 
           }
         }
       });
-      child.stderr.on("data", (chunk) => {
+      child.stderr?.on("data", (chunk) => {
         const text = normalizeRuntimeOutput(chunk);
         stderr += text;
         if (activeJobId) void touchJobRuntime(activeJobId, { output: true, outputChunk: text });
@@ -1076,11 +1085,11 @@ Summarize code review outcome, merge readiness, and deployment status according 
           }
         }
       });
-      child.on("error", () => {
+      child.on("error", (error) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        resolve({ ok: false, stdout, stderr });
+        resolve({ ok: false, stdout, stderr: `${stderr}\n${error instanceof Error ? error.message : String(error)}` });
       });
       child.on("close", (code) => {
         if (settled) return;
@@ -1252,6 +1261,11 @@ function formatCodexExecutionLog(stdout: string, stderr: string): string {
     stderr.trim() ? `stderr\n${stderr.trim()}` : ""
   ].filter(Boolean);
   return sections.join("\n\n");
+}
+
+function summarizeCodexFailure(stderr: string, stdout: string): string {
+  const combined = `${stderr.trim() || "Codex exited with a non-zero status."}${stdout.trim() ? `\n\nstdout bytes: ${Buffer.byteLength(stdout)}` : ""}`;
+  return limitFact(combined, 2000);
 }
 
 function trimProjectMemory(content: string): string {
