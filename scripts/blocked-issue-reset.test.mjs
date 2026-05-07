@@ -7,6 +7,7 @@ const routeSource = readFileSync("src/app/api/projects/[projectId]/issues/[issue
 const buttonSource = readFileSync("src/components/ProjectResetBlockedIssueButton.tsx", "utf8");
 const analyzeRouteSource = readFileSync("src/app/api/projects/[projectId]/issues/[issueId]/analyze-blocker/route.ts", "utf8");
 const analyzeButtonSource = readFileSync("src/components/ProjectAnalyzeBlockerButton.tsx", "utf8");
+const architectRouteSource = readFileSync("src/app/api/projects/[projectId]/issues/[issueId]/run-architect/route.ts", "utf8");
 
 describe("blocked issue reset control", () => {
   it("renders a dedicated reset button for gd:blocked issues", () => {
@@ -34,5 +35,12 @@ describe("blocked issue reset control", () => {
     assert.match(analyzeRouteSource, /type: "blocker_analysis_run"/);
     assert.match(analyzeButtonSource, /analyze-blocker/);
     assert.match(analyzeButtonSource, /\/jobs\/\$\{jobId\}\/run/);
+  });
+
+  it("runs architect blocker resolution from the issue instead of a hidden session action", () => {
+    assert.match(pageSource, /ProjectRunArchitectIssueButton/);
+    assert.match(architectRouteSource, /getIssueStage\(issue\) !== "gd:architect"/);
+    assert.match(architectRouteSource, /findBlockedIssueSession/);
+    assert.match(architectRouteSource, /type: "architect_blocker_run"/);
   });
 });
