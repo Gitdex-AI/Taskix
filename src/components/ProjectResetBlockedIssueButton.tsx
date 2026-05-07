@@ -44,8 +44,8 @@ export function ProjectResetBlockedIssueButton({
         radius="xl"
         leftSection={<RotateCcw size={14} />}
         loading={pending}
-        title="Reset blocked issue to Dev"
-        aria-label="Reset blocked issue to Dev"
+        title="Reset blocked issue"
+        aria-label="Reset blocked issue"
         onClick={resetIssue}
       >
         Reset

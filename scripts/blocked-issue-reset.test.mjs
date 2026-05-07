@@ -17,9 +17,10 @@ describe("blocked issue reset control", () => {
     assert.doesNotMatch(pageSource, /ProjectHandoffToQaButton[\s\S]*label="Reset"/);
   });
 
-  it("resets only blocked issues back to developer stage without queuing work", () => {
+  it("resets only blocked issues to the next runnable stage without queuing work", () => {
     assert.match(routeSource, /getIssueStage\(issue\) !== "gd:blocked"/);
-    assert.match(routeSource, /transitionIssueStage\(\{ repo: project\.githubRepo, issue, stage: "gd:dev"/);
+    assert.match(routeSource, /const resetStage = issue\.prUrl && issue\.prState !== "CLOSED" \? "gd:qa" : "gd:dev"/);
+    assert.match(routeSource, /transitionIssueStage\(\{ repo: project\.githubRepo, issue, stage: resetStage/);
     assert.doesNotMatch(routeSource, /createJob\(/);
     assert.doesNotMatch(routeSource, /\/jobs\/\$\{jobId\}\/run/);
   });
@@ -27,7 +28,7 @@ describe("blocked issue reset control", () => {
   it("posts to the reset endpoint and refreshes after success", () => {
     assert.match(buttonSource, /reset-to-dev/);
     assert.match(buttonSource, /router\.refresh\(\)/);
-    assert.match(buttonSource, /Reset blocked issue to Dev/);
+    assert.match(buttonSource, /Reset blocked issue/);
   });
 
   it("queues read-only blocker analysis for blocked issues", () => {

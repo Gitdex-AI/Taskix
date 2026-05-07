@@ -16,6 +16,9 @@ test("developer prompt requires reusable tests and rerun instructions", () => {
   assert.match(codex, /Add or update focused repeatable tests for the changed behavior whenever feasible/);
   assert.match(codex, /developer-owned tests are the reusable verification asset for QA, future fixes, and rebase retries/);
   assert.match(codex, /exact commands QA should rerun/);
+  assert.match(codex, /Identify the defect class and underlying contract behind the QA finding/);
+  assert.match(codex, /If QA found one missed case in a repeated pattern, look for sibling cases/);
+  assert.match(codex, /perform a comprehensive issue-scoped sweep with tests that cover the whole class/);
 });
 
 test("QA prompt validates coverage instead of authoring throwaway tests", () => {
@@ -23,4 +26,7 @@ test("QA prompt validates coverage instead of authoring throwaway tests", () => 
   assert.match(codex, /Do not edit product code or test code in the temporary QA worktree/);
   assert.match(codex, /If tests are missing, stale, or do not cover the acceptance criteria, fail QA as an implementation issue/);
   assert.match(codex, /whether future rechecks can be test-only or require focused manual smoke/);
+  assert.match(codex, /identify the defect class, not only the single reproduction/);
+  assert.match(codex, /same defect class keeps recurring/);
+  assert.match(codex, /Architect must clarify, narrow, split, or add to the issue/);
 });

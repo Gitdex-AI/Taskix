@@ -27,8 +27,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   ));
   if (activeJob) return NextResponse.json({ error: "Issue already has an active job." }, { status: 409 });
 
+  const resetStage = issue.prUrl && issue.prState !== "CLOSED" ? "gd:qa" : "gd:dev";
+
   try {
-    await transitionIssueStage({ repo: project.githubRepo, issue, stage: "gd:dev", prUrl: issue.prUrl ?? null });
+    await transitionIssueStage({ repo: project.githubRepo, issue, stage: resetStage, prUrl: issue.prUrl ?? null });
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : "Failed to reset blocked issue.",
@@ -37,8 +39,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ pr
   }
 
   workflow.status = "in_progress";
-  workflow.timeline.push(`Reset ${issue.issueId} from blocked to dev.`);
+  workflow.timeline.push(`Reset ${issue.issueId} from blocked to ${resetStage}.`);
   await saveWorkflow(workflow);
 
-  return NextResponse.json({ ok: true, stage: "gd:dev" });
+  return NextResponse.json({ ok: true, stage: resetStage });
 }

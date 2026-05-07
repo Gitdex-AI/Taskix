@@ -734,8 +734,9 @@ Hard rules:
 - Treat Next-generated next-env.d.ts route import changes as local tooling noise unless the GitHub issue explicitly asks to change Next type generation. Do not commit next-env.d.ts solely because next dev, next build, or tsc rewrote it; restore it before committing or explain that it was restored as generated noise.
 - Add or update focused repeatable tests for the changed behavior whenever feasible. These developer-owned tests are the reusable verification asset for QA, future fixes, and rebase retries.
 - In your summary, explicitly list test files added or updated, the exact commands QA should rerun, and any acceptance criteria that cannot reasonably be automated with a minimal manual validation scenario.
-- When retrying after QA failure, do not patch only the exact reported symptom. Identify the underlying contract behind the QA finding.
-- If the QA finding involves a trust boundary, API contract, state machine, permissions model, lifecycle rule, dependency ordering, ownedPaths boundary, data consistency rule, or cross-component interaction, audit analogous paths and update the complete affected workflow.
+- When retrying after QA failure, do not patch only the exact reported symptom. Identify the defect class and underlying contract behind the QA finding, then inspect analogous paths inside this issue's scope before committing.
+- For any QA finding, generalize from the concrete reproduction to the smallest complete rule that should hold across the issue: what behavior, boundary, lifecycle, data contract, dependency, user-visible surface, or integration path must be consistent.
+- Audit and fix the complete affected workflow for that rule. If QA found one missed case in a repeated pattern, look for sibling cases, fallback paths, error states, edge states, setup/teardown paths, generated states, and other surfaces covered by the same acceptance criterion.
 - Keep this audit scoped to the issue and ownedPaths. "Analogous paths" means paths necessary to satisfy the same contract for this issue, not unrelated broad refactors.
 - If the complete contract is not specified well enough to choose a safe fix, stop and return blockedType "spec" with the missing architect decision.
 - If there is no active PR, create a branch named gitdex/${input.workflowId}-issue-${input.issueNumber} or a similarly unique branch.
@@ -743,6 +744,7 @@ Hard rules:
 - Do not add/remove GitHub labels or comments. Gitdex server will create/update the PR and labels after you return JSON.
 - If implementation is blocked, return JSON with prUrl as an empty string and explain the blocker in summary.
 - Before returning any blocked result or making another follow-up fix after QA failed, explicitly decide whether this is developer work or architect work. If the current issue remains executable and the fix is clear, continue as developer. If the problem requires changing or clarifying the issue, return blockedType "spec".
+- If the issue has already failed QA multiple times for the same defect class and each fix only discovers another sibling case, pause before another patch. Either perform a comprehensive issue-scoped sweep with tests that cover the whole class, or return blockedType "spec" when the issue needs Architect to narrow scope, define the rule, adjust ownedPaths, split the issue, or state an acceptance strategy.
 - Set blockedType:
   - "none" when a PR was created or updated.
   - "implementation" when you are blocked by a normal implementation or tooling problem that developer can resolve on retry.
@@ -750,6 +752,7 @@ Hard rules:
   - "environment" when local workspace/tooling prevents work from starting or completing.
 - Choose "spec" when satisfying one acceptance criterion makes another criterion fail and the issue does not define a trusted signal, policy, dependency, interface, or ownership boundary that distinguishes the cases.
 - Choose "spec" when the latest QA/architect comments show repeated back-and-forth between incompatible fixes under the current issue text. Do not keep guessing a policy by changing code.
+- Choose "spec" when repeated QA failures show the issue text is too broad, ambiguous, or missing a testable definition that would let a developer know when the whole defect class is complete.
 - For blockedType "spec", do not create a PR. Explain the exact issue or architecture clarification needed so Architect can update the GitHub issue.
 
 Return JSON with summary, blockedType, branch, prUrl, changedFiles, testsRun.`;
@@ -915,6 +918,9 @@ Hard rules:
 - Treat Next-generated next-env.d.ts route import changes as local tooling noise unless the issue explicitly concerns Next type generation. Do not fail QA solely because next dev, next build, or tsc rewrote next-env.d.ts; restore it before reporting final git status when possible, or mention it as uncommitted generated noise.
 - When passing QA, include concise verification evidence in summary, including commands run and any observable state required by acceptance criteria.
 - Before every failed result, explicitly re-evaluate whether the issue should return to developer or architect. If the current issue remains executable and the developer can fix it without changing the issue, use failureType "implementation". If the issue needs clarification or policy/architecture changes before a developer can know the correct fix, use failureType "spec".
+- When QA finds a defect, identify the defect class, not only the single reproduction. Check whether prior QA failures on the same issue show the same class recurring across sibling paths after multiple developer fixes.
+- If the same defect class keeps recurring and the issue does not define a clear finite scope, rule, ownedPaths boundary, dependency order, or acceptance strategy that lets Developer finish the whole class, use failureType "spec" and explain what Architect must clarify, narrow, split, or add to the issue.
+- If the same defect class keeps recurring but the issue is clear and finite, use failureType "implementation" and explicitly ask Developer to perform a comprehensive issue-scoped sweep of analogous paths plus add tests for the class, rather than only fixing the listed examples.
 - Classify the result with failureType:
   - "none" only when passed is true.
   - "implementation" when the issue requirements are clear and the PR implementation does not satisfy them. These go back to developer.
@@ -925,6 +931,7 @@ Hard rules:
 - Use "environment" when local validation cannot proceed because of port binding, sandbox permissions, local tool failures, workspace preparation, or other runtime constraints unrelated to the PR. Gitdex will move the issue to gd:blocked.
 - Use "spec" when the PR alternates between passing one requirement and failing another because the issue does not define the trusted signal, policy, dependency, interface, or ownership boundary needed to satisfy both. This is an architecture/specification problem even if a concrete probe can reproduce the current failure.
 - Use "spec" when the issue has already cycled through multiple developer fixes and QA/architect findings show mutually incompatible expectations under the current issue text.
+- Use "spec" when repeated QA failures show that the current issue description is too broad or underspecified for a developer to determine completion without Architect rewriting the issue.
 - Use "implementation" only when the existing issue is executable as written and the developer can fix the PR without architect clarification. Gitdex will move the issue to gd:fix.
 - When failing QA, include actionable findings and reproduction notes. For spec failures, explain the architectural decision that is missing and do not prescribe code changes as if the developer can choose the policy alone.
 - Include test coverage assessment in the result: which developer-submitted tests were run, which acceptance criteria they cover, any missing coverage, and whether future rechecks can be test-only or require focused manual smoke.
