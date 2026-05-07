@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_url="${GITDEX_REPO_URL:-https://github.com/Gitdex-AI/gitdex.git}"
-ref="${GITDEX_REF:-v0.2.0}"
+ref="${GITDEX_REF:-v0.2.2}"
 install_dir="${GITDEX_INSTALL_DIR:-$HOME/.gitdex/app}"
 bin_dir="${GITDEX_BIN_DIR:-$HOME/.local/bin}"
 build="${GITDEX_SKIP_BUILD:-0}"

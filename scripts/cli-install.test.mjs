@@ -33,7 +33,7 @@ test("gitdex CLI can install macOS launchd and Linux user systemd services", () 
 
 test("install script installs from GitHub and links the local CLI", () => {
   assert.match(installSource, /GITDEX_REPO_URL:-https:\/\/github\.com\/Gitdex-AI\/gitdex\.git/);
-  assert.match(installSource, /GITDEX_REF:-v0\.2\.0/);
+  assert.match(installSource, /GITDEX_REF:-v0\.2\.2/);
   assert.match(installSource, /git clone --branch "\$ref"/);
   assert.match(installSource, /git -C "\$install_dir" checkout "\$ref"/);
   assert.match(installSource, /npm install/);
