@@ -7,6 +7,20 @@ import type { Settings } from "@/lib/types";
 const legacyCodexHome = `${dataDir}/codex-home`;
 const defaultCodexHome = path.join(os.homedir(), ".codex");
 
+export {
+  getMissingRequiredSettings,
+  settingsMetadata,
+  settingsMetadataByKey,
+  settingsMetadataGroups
+} from "@/lib/settings-metadata";
+export type {
+  MissingRequiredSetting,
+  SettingMetadata,
+  SettingRequirement,
+  SettingsMetadataGroup,
+  SettingsMetadataGroupId
+} from "@/lib/settings-metadata";
+
 const defaults: Settings = {
   appBaseUrl: "http://localhost:8000",
   telegramBotToken: "",
